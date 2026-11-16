@@ -15,10 +15,17 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Pair of images presented to a user for voting")
 public record VoteResponse(
+        @Schema(description = "First image ID", example = "0")
         String id1,
+        @Schema(description = "Second image ID", example = "1")
         String id2,
+        @Schema(description = "Whether the survey is currently open for voting", example = "true")
         Boolean surveyIsRunning,
+        @Schema(description = "Survey perspective/question", example = "Which logo is better?")
         String perspective
 ) {
     public String getId1() {

@@ -15,7 +15,13 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-public record ImageRequest(String file) {
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Payload to upload an image to a survey")
+public record ImageRequest(
+        @Schema(description = "Data URL or base64 encoded image string", example = "data:image/png;base64,iVBORw0KGgo...", requiredMode = Schema.RequiredMode.REQUIRED)
+        String file
+) {
     public String getFile() {
         return file;
     }

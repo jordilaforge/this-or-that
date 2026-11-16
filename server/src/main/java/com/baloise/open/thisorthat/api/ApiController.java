@@ -20,6 +20,13 @@ import com.baloise.open.thisorthat.dto.Image;
 import com.baloise.open.thisorthat.dto.Survey;
 import com.baloise.open.thisorthat.exception.*;
 import com.baloise.open.thisorthat.service.SurveyService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +37,7 @@ import java.util.Base64;
 import static org.springframework.http.ResponseEntity.ok;
 
 @RestController
+@Tag(name = "Surveys", description = "Endpoints for creating, managing, voting, and retrieving results for surveys")
 public class ApiController {
 
     private final SurveyService surveyService;
@@ -40,19 +48,33 @@ public class ApiController {
 
     @PostMapping(path = "/create", consumes = "application/json")
     @CrossOrigin(origins = "*")
-    public SurveyResponse createSurvey(@RequestBody CreateSurveyRequest createSurveyRequest) {
+    @Operation(summary = "Create a new survey", description = "Initializes a new survey with the provided perspective (question/topic) and returns the generated survey code.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Survey successfully created",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = SurveyResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    public SurveyResponse createSurvey(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Details for the survey to be created", required = true)
+            @RequestBody CreateSurveyRequest createSurveyRequest) {
         try {
             Survey survey = surveyService.createSurvey(createSurveyRequest.getPerspective());
             return new SurveyResponse(survey.getId());
         } catch (Exception e) {
-
             throw buildError(e);
         }
     }
 
     @DeleteMapping("/{code}/delete")
     @CrossOrigin(origins = "*")
-    public void deleteSurvey(@PathVariable("code") String surveyCode) {
+    @Operation(summary = "Delete a survey", description = "Permanently deletes a survey and all associated votes, scores, and images.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Survey successfully deleted"),
+            @ApiResponse(responseCode = "404", description = "Survey not found")
+    })
+    public void deleteSurvey(
+            @Parameter(description = "Unique survey code", required = true, example = "1pv1")
+            @PathVariable("code") String surveyCode) {
         try {
             surveyService.deleteSurvey(surveyCode);
         } catch (Exception e) {
@@ -62,7 +84,15 @@ public class ApiController {
 
     @PostMapping("/{code}/start")
     @CrossOrigin(origins = "*")
-    public void startSurvey(@PathVariable("code") String surveyCode) {
+    @Operation(summary = "Start a survey", description = "Opens the survey for voting and initializes score tracking.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Survey successfully started"),
+            @ApiResponse(responseCode = "400", description = "Survey already started or stopped"),
+            @ApiResponse(responseCode = "404", description = "Survey not found")
+    })
+    public void startSurvey(
+            @Parameter(description = "Unique survey code", required = true, example = "1pv1")
+            @PathVariable("code") String surveyCode) {
         try {
             surveyService.startSurvey(surveyCode);
         } catch (Exception e) {
@@ -72,7 +102,15 @@ public class ApiController {
 
     @PostMapping("/{code}/stop")
     @CrossOrigin(origins = "*")
-    public void stopSurvey(@PathVariable("code") String surveyCode) {
+    @Operation(summary = "Stop a survey", description = "Closes the survey for further voting and calculates the final scores.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Survey successfully stopped"),
+            @ApiResponse(responseCode = "400", description = "Survey already stopped"),
+            @ApiResponse(responseCode = "404", description = "Survey not found")
+    })
+    public void stopSurvey(
+            @Parameter(description = "Unique survey code", required = true, example = "1pv1")
+            @PathVariable("code") String surveyCode) {
         try {
             surveyService.stopSurvey(surveyCode);
         } catch (Exception e) {
@@ -82,7 +120,18 @@ public class ApiController {
 
     @GetMapping(value = "/{code}/vote")
     @CrossOrigin(origins = "*")
-    public VoteResponse getVote(@RequestHeader("userId") String userId, @PathVariable("code") String surveyCode) {
+    @Operation(summary = "Get next pair of images to vote on", description = "Returns a pair of image IDs for comparison according to the selection algorithm.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Next image pair retrieved",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = VoteResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Survey is stopped"),
+            @ApiResponse(responseCode = "404", description = "Survey not found")
+    })
+    public VoteResponse getVote(
+            @Parameter(description = "Identifier of the voting user", required = true, example = "user-123")
+            @RequestHeader("userId") String userId,
+            @Parameter(description = "Unique survey code", required = true, example = "1pv1")
+            @PathVariable("code") String surveyCode) {
         try {
             return surveyService.getVote(surveyCode, userId);
         } catch (Exception e) {
@@ -92,7 +141,19 @@ public class ApiController {
 
     @PostMapping(value = "/{code}/vote", consumes = "application/json")
     @CrossOrigin(origins = "*")
-    public ResponseEntity<VoteResponse> setVote(@RequestHeader("userId") String userId, @PathVariable("code") String surveyCode, @RequestBody VoteRequest voteRequest) {
+    @Operation(summary = "Submit a vote", description = "Records a user's selection between two images (winner vs loser).")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Vote successfully registered"),
+            @ApiResponse(responseCode = "400", description = "Survey is stopped"),
+            @ApiResponse(responseCode = "404", description = "Survey not found")
+    })
+    public ResponseEntity<VoteResponse> setVote(
+            @Parameter(description = "Identifier of the voting user", required = true, example = "user-123")
+            @RequestHeader("userId") String userId,
+            @Parameter(description = "Unique survey code", required = true, example = "1pv1")
+            @PathVariable("code") String surveyCode,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Vote decision specifying winner and loser", required = true)
+            @RequestBody VoteRequest voteRequest) {
         try {
             surveyService.setVote(surveyCode, voteRequest, userId);
             return ok().build();
@@ -103,7 +164,16 @@ public class ApiController {
 
     @GetMapping(value = "/{code}/score")
     @CrossOrigin(origins = "*")
-    public ScoreResponse getScore(@PathVariable("code") String surveyCode) {
+    @Operation(summary = "Get survey scores and statistics", description = "Retrieves ranking and scores of all images once the survey has ended.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Scores retrieved successfully",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ScoreResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Survey is still running"),
+            @ApiResponse(responseCode = "404", description = "Survey not found")
+    })
+    public ScoreResponse getScore(
+            @Parameter(description = "Unique survey code", required = true, example = "1pv1")
+            @PathVariable("code") String surveyCode) {
         try {
             return surveyService.getScore(surveyCode);
         } catch (Exception e) {
@@ -113,7 +183,17 @@ public class ApiController {
 
     @PostMapping(value = "/{code}/image", consumes = "application/json")
     @CrossOrigin(origins = "*")
-    public ImageResponse addImageToSurvey(@PathVariable("code") String surveyCode, @RequestBody ImageRequest imageRequest) {
+    @Operation(summary = "Add an image to a survey", description = "Uploads an image (as base64 string) to the survey and returns its assigned image ID.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Image successfully added",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ImageResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Survey not found")
+    })
+    public ImageResponse addImageToSurvey(
+            @Parameter(description = "Unique survey code", required = true, example = "1pv1")
+            @PathVariable("code") String surveyCode,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Image payload containing base64 data", required = true)
+            @RequestBody ImageRequest imageRequest) {
         try {
             Image image = new Image(null, imageRequest.getFile());
             String id = surveyService.addImageToSurvey(surveyCode, image);
@@ -126,7 +206,17 @@ public class ApiController {
 
     @GetMapping(value = "/{code}/image/{imageId}", produces = "image/jpeg")
     @CrossOrigin(origins = "*")
-    public byte[] getImageFromSurvey(@PathVariable("code") String surveyCode, @PathVariable("imageId") String imageId) {
+    @Operation(summary = "Download an image by ID", description = "Returns the binary JPEG image data for the specified image ID.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Binary JPEG image data",
+                    content = @Content(mediaType = "image/jpeg", schema = @Schema(type = "string", format = "binary"))),
+            @ApiResponse(responseCode = "404", description = "Survey or image not found")
+    })
+    public byte[] getImageFromSurvey(
+            @Parameter(description = "Unique survey code", required = true, example = "1pv1")
+            @PathVariable("code") String surveyCode,
+            @Parameter(description = "Identifier of the image", required = true, example = "0")
+            @PathVariable("imageId") String imageId) {
         try {
             Image image = surveyService.getImageFromSurvey(surveyCode, imageId);
             String base64Image = image.getFile().split(",")[1];

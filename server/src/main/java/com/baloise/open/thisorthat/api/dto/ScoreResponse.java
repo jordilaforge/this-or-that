@@ -15,13 +15,21 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.util.List;
 
+@Schema(description = "Survey score results and statistics")
 public record ScoreResponse(
+        @Schema(description = "List of image scores ordered from highest to lowest")
         List<Score> scores,
+        @Schema(description = "Whether the survey is currently active", example = "false")
         Boolean surveyIsRunning,
+        @Schema(description = "Perspective / question of the survey", example = "Which logo is better?")
         String perspective,
+        @Schema(description = "Total number of votes registered", example = "10")
         Integer numberOfVotes,
+        @Schema(description = "Total number of unique users who voted", example = "3")
         Integer numberOfUsers
 ) {
     public List<Score> getScores() {

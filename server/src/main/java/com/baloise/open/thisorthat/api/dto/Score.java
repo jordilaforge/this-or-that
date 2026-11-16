@@ -15,7 +15,15 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-public record Score(String imageId, Integer score) {
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Score details for a single image")
+public record Score(
+        @Schema(description = "Image ID", example = "0")
+        String imageId,
+        @Schema(description = "Calculated score", example = "42")
+        Integer score
+) {
     public String getImageId() {
         return imageId;
     }

@@ -15,7 +15,15 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-public record VoteRequest(String winner, String loser) {
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Payload to register a vote between two images")
+public record VoteRequest(
+        @Schema(description = "ID of the winning image", example = "0", requiredMode = Schema.RequiredMode.REQUIRED)
+        String winner,
+        @Schema(description = "ID of the losing image", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
+        String loser
+) {
     public String getWinner() {
         return winner;
     }

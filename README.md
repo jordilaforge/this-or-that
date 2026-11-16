@@ -15,6 +15,12 @@ Each participant of the voting can make votes based on image by selecting one of
 ### Client
 https://baloise.github.io/this-or-that
 
+### Server (API & Swagger)
+When the server is running:
+ * **Swagger UI**: http://localhost:8080/swagger-ui.html
+ * **OpenAPI Spec (JSON)**: http://localhost:8080/v3/api-docs
+ * **OpenAPI Spec (YAML)**: http://localhost:8080/v3/api-docs.yaml
+
 ## Requirements
 
 ### Server

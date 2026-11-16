@@ -15,7 +15,13 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-public record ImageResponse(String id) {
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Response returned after an image is added")
+public record ImageResponse(
+        @Schema(description = "Assigned unique image ID within the survey", example = "0")
+        String id
+) {
     public String getId() {
         return id;
     }

@@ -15,7 +15,13 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-public record SurveyResponse(String code) {
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Response returned after creating a survey")
+public record SurveyResponse(
+        @Schema(description = "Generated unique survey code", example = "1pv1")
+        String code
+) {
     public String getCode() {
         return code;
     }

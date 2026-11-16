@@ -15,7 +15,13 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-public record CreateSurveyRequest(String perspective) {
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Payload to create a new voting survey")
+public record CreateSurveyRequest(
+        @Schema(description = "Question or topic perspective for this survey", example = "Which logo is better?", requiredMode = Schema.RequiredMode.REQUIRED)
+        String perspective
+) {
     public String getPerspective() {
         return perspective;
     }
