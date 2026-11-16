@@ -35,3 +35,10 @@ When the server is running:
 [![](http://api.qrserver.com/v1/create-qr-code/?color=000000&bgcolor=FFFFFF&data=https%3A%2F%2Fbaloise.github.io%2Fthis-or-that%2F&qzone=1&margin=0&size=200x200&ecc=L)](https://baloise.github.io/this-or-that/)
  * NodeJS
  * NPM
+
+## Build
+
+Build the entire project (frontend and backend) with Maven:
+```bash
+mvn clean package
+```
