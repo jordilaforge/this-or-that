@@ -22,7 +22,8 @@ import com.baloise.open.thisorthat.dto.Vote;
 import com.baloise.open.thisorthat.exception.DeleteFailedException;
 import com.baloise.open.thisorthat.exception.ImageNotFoundException;
 import com.baloise.open.thisorthat.exception.SurveyNotFoundException;
-import lombok.extern.log4j.Log4j2;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 
 import java.util.Date;
@@ -32,8 +33,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 @Repository
-@Log4j2
 public class InMemoryDatabase implements Database {
+
+    private static final Logger log = LoggerFactory.getLogger(InMemoryDatabase.class);
 
     private static final CopyOnWriteArrayList<Survey> surveys = new CopyOnWriteArrayList<>();
     private static long createdSurveyCounter = 0L;
@@ -75,10 +77,10 @@ public class InMemoryDatabase implements Database {
     @Override
     public String addImageToSurvey(String surveyCode, Image image) {
         Survey survey = getSurvey(surveyCode);
-        survey.getImages().add(image);
-        String id = Integer.toString(survey.getImages().indexOf(image));
-        image.setId(id);
-        log.info("added image {} to {}", image.getId(), surveyCode);
+        String id = Integer.toString(survey.getImages().size());
+        Image imageWithId = new Image(id, image.file());
+        survey.getImages().add(imageWithId);
+        log.info("added image {} to {}", id, surveyCode);
         return id;
     }
 

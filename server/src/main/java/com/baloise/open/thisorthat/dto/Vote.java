@@ -16,18 +16,18 @@
 package com.baloise.open.thisorthat.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class Vote {
-    private String winner;
-    private String loser;
-    private String userId;
+public record Vote(String winner, String loser, String userId) {
+    public String getWinner() {
+        return winner;
+    }
+
+    public String getLoser() {
+        return loser;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
 }

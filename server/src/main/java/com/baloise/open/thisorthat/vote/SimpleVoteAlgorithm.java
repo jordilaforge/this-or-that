@@ -19,15 +19,17 @@ import com.baloise.open.thisorthat.db.InMemoryDatabase;
 import com.baloise.open.thisorthat.dto.*;
 import com.baloise.open.thisorthat.exception.SurveyStoppedException;
 import com.baloise.open.thisorthat.vote.image.selection.ImageSelectionAlgorithm;
-import lombok.extern.log4j.Log4j2;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Component
-@Log4j2
 public class SimpleVoteAlgorithm implements VoteAlgorithm {
+
+    private static final Logger log = LoggerFactory.getLogger(SimpleVoteAlgorithm.class);
 
     private static final double DEFAULT_WEIGHT_PER_VOTE = 10.0;
 
@@ -44,30 +46,22 @@ public class SimpleVoteAlgorithm implements VoteAlgorithm {
     public void initialize(String surveyCode) {
         List<ScoreItem> scores = new ArrayList<>();
         inMemoryDatabase.getSurvey(surveyCode).getImages().forEach(image -> {
-            ScoreItem score = ScoreItem.builder()
-                    .imageId(image.getId())
-                    .score(0)
-                    .build();
+            ScoreItem score = new ScoreItem(image.getId(), 0);
             scores.add(score);
         });
-        for (ScoreItem scoreItem : scores) {
-            inMemoryDatabase.addScore(surveyCode, scoreItem);
-        }
-        log.info("initialized algorithm for {}", inMemoryDatabase.getSurvey(surveyCode).getId());
+        inMemoryDatabase.getSurvey(surveyCode).setScores(scores);
+        log.info("Initialized survey {} with empty scores", inMemoryDatabase.getSurvey(surveyCode).getId());
     }
 
     @Override
     public VoteItem getVote(String surveyCode, String userId) {
         Pair<Image> images = imageSelectionAlgorithm.getNextImagePair(surveyCode, userId);
-        return VoteItem.builder()
-                .file1(images.getT1())
-                .file2(images.getT2())
-                .build();
+        return new VoteItem(images.getT1(), images.getT2());
     }
 
     @Override
     public void setVote(String surveyCode, String imageIdWinner, String imageIdLooser, String userId) {
-        inMemoryDatabase.persistVote(surveyCode, Vote.builder().loser(imageIdLooser).winner(imageIdWinner).userId(userId).build());
+        inMemoryDatabase.persistVote(surveyCode, new Vote(imageIdWinner, imageIdLooser, userId));
         log.info("voted for {} winner {} looser {}", surveyCode, imageIdWinner, imageIdLooser);
     }
 
@@ -91,10 +85,7 @@ public class SimpleVoteAlgorithm implements VoteAlgorithm {
         }
 
         final List<ScoreItem> list = imageScores.keySet().stream()
-                .map(imageId -> ScoreItem.builder()
-                        .imageId(imageId)
-                        .score(imageScores.get(imageId).intValue())
-                        .build())
+                .map(imageId -> new ScoreItem(imageId, imageScores.get(imageId).intValue()))
                 .collect(Collectors.toList());
         log.info("EXIT calculateScore(scores={})", list);
         return list;

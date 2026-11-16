@@ -15,16 +15,12 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+public record Score(String imageId, Integer score) {
+    public String getImageId() {
+        return imageId;
+    }
 
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@Builder
-public class Score {
-    private String imageId;
-    private Integer score;
+    public Integer getScore() {
+        return score;
+    }
 }

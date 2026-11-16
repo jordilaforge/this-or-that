@@ -18,7 +18,8 @@ package com.baloise.open.thisorthat.job;
 import com.baloise.open.thisorthat.db.InMemoryDatabase;
 import com.baloise.open.thisorthat.dto.Survey;
 import com.baloise.open.thisorthat.exception.DatabaseException;
-import lombok.extern.log4j.Log4j2;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -26,9 +27,10 @@ import org.springframework.stereotype.Component;
 import java.util.Calendar;
 import java.util.List;
 
-@Log4j2
 @Component
 public class CleanupJob implements Runnable {
+
+    private static final Logger log = LoggerFactory.getLogger(CleanupJob.class);
 
     @Autowired
     private InMemoryDatabase inMemoryDatabase;
@@ -44,7 +46,7 @@ public class CleanupJob implements Runnable {
             try {
                 inMemoryDatabase.removeSurvey(survey.getId());
             } catch (DatabaseException e) {
-                log.error("Error when trying to remove survey with code {}. Message {}", survey.getId(), e.getMessage());
+                log.error("Error removing old survey with id: {}", survey.getId());
             }
         }
         log.info("EXIT CleanupJob RUN()");

@@ -15,18 +15,25 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+public record VoteResponse(
+        String id1,
+        String id2,
+        Boolean surveyIsRunning,
+        String perspective
+) {
+    public String getId1() {
+        return id1;
+    }
 
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@Builder
-public class VoteResponse {
-    private String id1;
-    private String id2;
-    private Boolean surveyIsRunning;
-    private String perspective;
+    public String getId2() {
+        return id2;
+    }
+
+    public Boolean getSurveyIsRunning() {
+        return surveyIsRunning;
+    }
+
+    public String getPerspective() {
+        return perspective;
+    }
 }

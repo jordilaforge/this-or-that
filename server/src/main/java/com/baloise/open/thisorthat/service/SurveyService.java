@@ -25,15 +25,17 @@ import com.baloise.open.thisorthat.dto.Survey;
 import com.baloise.open.thisorthat.dto.VoteItem;
 import com.baloise.open.thisorthat.exception.*;
 import com.baloise.open.thisorthat.vote.SimpleVoteAlgorithm;
-import lombok.extern.log4j.Log4j2;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-@Log4j2
 public class SurveyService {
+
+    private static final Logger log = LoggerFactory.getLogger(SurveyService.class);
 
     private final InMemoryDatabase inMemoryDatabase;
 
@@ -50,15 +52,7 @@ public class SurveyService {
         long index = inMemoryDatabase.surveyCount();
         String code = CodeCreator.createCode(index);
         log.info("code created: {}", code);
-        Survey survey = Survey.builder()
-                .id(code)
-                .creationDate(new Date())
-                .perspective(perspective)
-                .images(new ArrayList<>())
-                .scores(new ArrayList<>())
-                .votes(new ArrayList<>())
-                .started(false)
-                .build();
+        Survey survey = new Survey(code, perspective);
         inMemoryDatabase.addSurvey(survey);
         log.info("added survey to inMemory");
         return survey;
@@ -81,12 +75,12 @@ public class SurveyService {
         checkIfSurveyIsStopped(surveyCode);
         VoteItem voteItem = randomAlgorithm.getVote(surveyCode, userId);
         log.info("survey {} get vote from {} image1: {} image2: {}", surveyCode, userId, voteItem.getFile1().getId(), voteItem.getFile2().getId());
-        return VoteResponse.builder()
-                .id1(voteItem.getFile1().getId())
-                .id2(voteItem.getFile2().getId())
-                .perspective(inMemoryDatabase.getSurvey(surveyCode).getPerspective())
-                .surveyIsRunning(true)
-                .build();
+        return new VoteResponse(
+                voteItem.getFile1().getId(),
+                voteItem.getFile2().getId(),
+                true,
+                inMemoryDatabase.getSurvey(surveyCode).getPerspective()
+        );
     }
 
     public void setVote(String surveyCode, VoteRequest voteRequest, String userId) {
@@ -111,21 +105,18 @@ public class SurveyService {
         List<Score> scores = survey.getScores().stream()
                 .map(scoreItem -> {
                     Image file = getImageFromSurvey(survey, scoreItem.getImageId());
-                    return Score.builder()
-                            .score(scoreItem.getScore())
-                            .imageId(file.getId())
-                            .build();
+                    return new Score(file.getId(), scoreItem.getScore());
                 })
                 .sorted((score1, score2) -> score2.getScore().compareTo(score1.getScore()))
                 .collect(Collectors.toList());
         log.info("survey {} getScore", surveyCode);
-        return ScoreResponse.builder()
-                .scores(scores)
-                .numberOfVotes(survey.getVotes().size())
-                .numberOfUsers(userIdSet.size())
-                .surveyIsRunning(false)
-                .perspective(survey.getPerspective())
-                .build();
+        return new ScoreResponse(
+                scores,
+                false,
+                survey.getPerspective(),
+                survey.getVotes().size(),
+                userIdSet.size()
+        );
     }
 
     private Survey getSurvey(String surveyCode) {

@@ -15,15 +15,8 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@Builder
-public class CreateSurveyRequest {
-    private String perspective;
+public record CreateSurveyRequest(String perspective) {
+    public String getPerspective() {
+        return perspective;
+    }
 }

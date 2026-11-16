@@ -16,17 +16,14 @@
 package com.baloise.open.thisorthat.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class VoteItem {
-    Image file1;
-    Image file2;
+public record VoteItem(Image file1, Image file2) {
+    public Image getFile1() {
+        return file1;
+    }
+
+    public Image getFile2() {
+        return file2;
+    }
 }

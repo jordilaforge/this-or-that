@@ -43,9 +43,7 @@ public class ApiController {
     public SurveyResponse createSurvey(@RequestBody CreateSurveyRequest createSurveyRequest) {
         try {
             Survey survey = surveyService.createSurvey(createSurveyRequest.getPerspective());
-            return SurveyResponse.builder()
-                    .code(survey.getId())
-                    .build();
+            return new SurveyResponse(survey.getId());
         } catch (Exception e) {
 
             throw buildError(e);
@@ -117,14 +115,10 @@ public class ApiController {
     @CrossOrigin(origins = "*")
     public ImageResponse addImageToSurvey(@PathVariable("code") String surveyCode, @RequestBody ImageRequest imageRequest) {
         try {
-            Image image = Image.builder()
-                    .file(imageRequest.getFile())
-                    .build();
+            Image image = new Image(null, imageRequest.getFile());
             String id = surveyService.addImageToSurvey(surveyCode, image);
 
-            return ImageResponse.builder()
-                    .id(id)
-                    .build();
+            return new ImageResponse(id);
         } catch (Exception e) {
             throw buildError(e);
         }

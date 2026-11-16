@@ -16,17 +16,14 @@
 package com.baloise.open.thisorthat.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@Builder(toBuilder = true)
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class Image {
-    private String id;
-    private String file;
+public record Image(String id, String file) {
+    public String getId() {
+        return id;
+    }
+
+    public String getFile() {
+        return file;
+    }
 }

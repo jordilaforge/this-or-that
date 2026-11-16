@@ -15,16 +15,12 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+public record VoteRequest(String winner, String loser) {
+    public String getWinner() {
+        return winner;
+    }
 
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@Builder
-public class VoteRequest {
-    private String winner;
-    private String loser;
+    public String getLoser() {
+        return loser;
+    }
 }

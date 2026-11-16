@@ -15,15 +15,8 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@Builder
-public class ImageRequest {
-    private String file;
+public record ImageRequest(String file) {
+    public String getFile() {
+        return file;
+    }
 }

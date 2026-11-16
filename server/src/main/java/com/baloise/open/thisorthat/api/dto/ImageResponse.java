@@ -15,15 +15,8 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@Builder
-public class ImageResponse {
-    private String id;
+public record ImageResponse(String id) {
+    public String getId() {
+        return id;
+    }
 }

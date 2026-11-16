@@ -15,21 +15,32 @@
  */
 package com.baloise.open.thisorthat.api.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.util.List;
 
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@Builder
-public class ScoreResponse {
-    private List<Score> scores;
-    private Boolean surveyIsRunning;
-    private String perspective;
-    private Integer numberOfVotes;
-    private Integer numberOfUsers;
+public record ScoreResponse(
+        List<Score> scores,
+        Boolean surveyIsRunning,
+        String perspective,
+        Integer numberOfVotes,
+        Integer numberOfUsers
+) {
+    public List<Score> getScores() {
+        return scores;
+    }
+
+    public Boolean getSurveyIsRunning() {
+        return surveyIsRunning;
+    }
+
+    public String getPerspective() {
+        return perspective;
+    }
+
+    public Integer getNumberOfVotes() {
+        return numberOfVotes;
+    }
+
+    public Integer getNumberOfUsers() {
+        return numberOfUsers;
+    }
 }
