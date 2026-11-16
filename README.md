@@ -18,7 +18,8 @@ https://baloise.github.io/this-or-that
 ## Requirements
 
 ### Server
- * spring-boot
+ * Spring Boot 4.1.2
+ * Java 25
  * Maven
  * MongoDB
 

@@ -83,7 +83,7 @@ https://github.com/baloise/this-or-that
 ## Code Camp Scope
 - new frontend without baloise branding
 - app for PlayStore and AppleStore
-- backend with Spring Boot
+- backend with Spring Boot 4.1.2 (Java 25)
 - improve Azure Cloud hosting
 
 @snapend
