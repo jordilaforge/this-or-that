@@ -78,6 +78,14 @@ jobs:
       - name: Build backend JAR
         run: mvn clean package -pl server -am --batch-mode -DskipTests
 
+      - name: Upload server JAR artifact
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-jar
+          path: server/target/*.jar
+          if-no-files-found: error
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -179,3 +187,61 @@ jobs:
             ${{ env.FRONTEND_IMAGE }}:latest
             ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
           cache-from: type=gha
+
+  deploy-backend:
+    name: Deploy Backend to Google Cloud Run
+    needs: docker-backend
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download server JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: server-jar
+          path: server/target
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker authentication for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ vars.GCP_REGION || secrets.GCP_REGION || 'us-central1' }}-docker.pkg.dev --quiet
+
+      - name: Build and Push Docker image to Artifact Registry
+        env:
+          REGION: ${{ vars.GCP_REGION || secrets.GCP_REGION || 'us-central1' }}
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID || secrets.GCP_PROJECT_ID }}
+        run: |
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/this-or-that/backend"
+          docker build -t ${IMAGE}:${{ github.sha }} -t ${IMAGE}:latest ./server
+          docker push ${IMAGE}:${{ github.sha }}
+          docker push ${IMAGE}:latest
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: this-or-that-api
+          image: ${{ vars.GCP_REGION || secrets.GCP_REGION || 'us-central1' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID || secrets.GCP_PROJECT_ID }}/this-or-that/backend:${{ github.sha }}
+          region: ${{ vars.GCP_REGION || secrets.GCP_REGION || 'us-central1' }}
+          flags: |
+            --port=8080
+            --memory=512Mi
+            --min-instances=0
+            --max-instances=2
+            --allow-unauthenticated
+
+      - name: Show Live API URL
+        run: |
+          echo "🚀 Backend successfully deployed to: ${{ steps.deploy.outputs.url }}"
