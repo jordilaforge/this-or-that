@@ -1,0 +1,280 @@
+/*
+ * Copyright 2018 Baloise Group
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.thisorthat.service;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.thisorthat.api.dto.ScoreResponse;
+import org.thisorthat.api.dto.VoteRequest;
+import org.thisorthat.api.dto.VoteResponse;
+import org.thisorthat.db.InMemoryDatabase;
+import org.thisorthat.dto.*;
+import org.thisorthat.exception.*;
+import org.thisorthat.vote.SimpleVoteAlgorithm;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class SurveyServiceTest {
+
+    @Mock
+    private InMemoryDatabase inMemoryDatabase;
+
+    @Mock
+    private SimpleVoteAlgorithm randomAlgorithm;
+
+    @InjectMocks
+    private SurveyService surveyService;
+
+    @Test
+    @DisplayName("createSurvey should generate code and save survey to database")
+    void testCreateSurvey() {
+        when(inMemoryDatabase.surveyCount()).thenReturn(0L);
+
+        Survey created = surveyService.createSurvey("Test Perspective");
+
+        assertNotNull(created);
+        assertNotNull(created.getId());
+        assertEquals("Test Perspective", created.getPerspective());
+        assertFalse(created.getStarted());
+
+        ArgumentCaptor<Survey> captor = ArgumentCaptor.forClass(Survey.class);
+        verify(inMemoryDatabase).addSurvey(captor.capture());
+        assertEquals(created.getId(), captor.getValue().getId());
+    }
+
+    @Test
+    @DisplayName("startSurvey should start and initialize survey when not yet started")
+    void testStartSurveySuccess() {
+        String code = "srv-1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), false, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        surveyService.startSurvey(code);
+
+        verify(inMemoryDatabase).startSurvey(code);
+        verify(randomAlgorithm).initialize(code);
+    }
+
+    @Test
+    @DisplayName("startSurvey should throw SurveyAlreadyStartedException when already started")
+    void testStartSurveyAlreadyStarted() {
+        String code = "srv-1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), true, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        assertThrows(SurveyAlreadyStartedException.class, () -> surveyService.startSurvey(code));
+        verify(inMemoryDatabase, never()).startSurvey(code);
+    }
+
+    @Test
+    @DisplayName("stopSurvey should calculate scores and stop survey when running")
+    void testStopSurveySuccess() {
+        String code = "srv-1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), true, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        surveyService.stopSurvey(code);
+
+        verify(randomAlgorithm).calculateScoresAndStopSurvey(code);
+    }
+
+    @Test
+    @DisplayName("stopSurvey should throw SurveyStoppedException when already stopped")
+    void testStopSurveyAlreadyStopped() {
+        String code = "srv-1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), false, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        assertThrows(SurveyStoppedException.class, () -> surveyService.stopSurvey(code));
+        verify(randomAlgorithm, never()).calculateScoresAndStopSurvey(code);
+    }
+
+    @Test
+    @DisplayName("getVote should return VoteResponse when survey is running")
+    void testGetVoteSuccess() {
+        String code = "srv-1";
+        String userId = "user-1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), true, new ArrayList<>(), new ArrayList<>(), "Perspective");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        Image img1 = new Image("0", "file0");
+        Image img2 = new Image("1", "file1");
+        when(randomAlgorithm.getVote(code, userId)).thenReturn(new VoteItem(img1, img2));
+
+        VoteResponse response = surveyService.getVote(code, userId);
+
+        assertNotNull(response);
+        assertEquals("0", response.id1());
+        assertEquals("1", response.id2());
+        assertTrue(response.surveyIsRunning());
+        assertEquals("Perspective", response.perspective());
+    }
+
+    @Test
+    @DisplayName("getVote should throw SurveyStoppedException when survey is stopped")
+    void testGetVoteStopped() {
+        String code = "srv-1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), false, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        assertThrows(SurveyStoppedException.class, () -> surveyService.getVote(code, "u1"));
+    }
+
+    @Test
+    @DisplayName("setVote should persist vote when survey is running")
+    void testSetVoteSuccess() {
+        String code = "srv-1";
+        String userId = "u1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), true, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        VoteRequest voteRequest = new VoteRequest("0", "1");
+        surveyService.setVote(code, voteRequest, userId);
+
+        verify(randomAlgorithm).setVote(code, "0", "1", userId);
+    }
+
+    @Test
+    @DisplayName("setVote should throw SurveyStoppedException when survey is stopped")
+    void testSetVoteStopped() {
+        String code = "srv-1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), false, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        VoteRequest voteRequest = new VoteRequest("0", "1");
+        assertThrows(SurveyStoppedException.class, () -> surveyService.setVote(code, voteRequest, "u1"));
+    }
+
+    @Test
+    @DisplayName("getScore should return scores sorted descending when survey has ended")
+    void testGetScoreSuccess() {
+        String code = "srv-1";
+        Image img0 = new Image("0", "f0");
+        Image img1 = new Image("1", "f1");
+        List<Image> images = List.of(img0, img1);
+        List<ScoreItem> scoreItems = List.of(new ScoreItem("0", 5), new ScoreItem("1", 20));
+        List<Vote> votes = List.of(
+                new Vote("1", "0", "u1"),
+                new Vote("1", "0", "u2"),
+                new Vote("0", "1", "u1")
+        );
+        Survey survey = new Survey(new Date(), code, images, false, scoreItems, votes, "Persp");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        ScoreResponse response = surveyService.getScore(code);
+
+        assertNotNull(response);
+        assertFalse(response.surveyIsRunning());
+        assertEquals("Persp", response.perspective());
+        assertEquals(3, response.numberOfVotes());
+        assertEquals(2, response.numberOfUsers()); // u1, u2
+        assertEquals(2, response.scores().size());
+        // Should be sorted descending by score: img1 (20) first, then img0 (5)
+        assertEquals("1", response.scores().get(0).imageId());
+        assertEquals(20, response.scores().get(0).score());
+        assertEquals("0", response.scores().get(1).imageId());
+        assertEquals(5, response.scores().get(1).score());
+    }
+
+    @Test
+    @DisplayName("getScore should throw SurveyStillRunningException when survey is still running")
+    void testGetScoreStillRunning() {
+        String code = "srv-1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), true, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        assertThrows(SurveyStillRunningException.class, () -> surveyService.getScore(code));
+    }
+
+    @Test
+    @DisplayName("getScore should throw SurveyIncompleteException when scores or votes are null")
+    void testGetScoreIncomplete() {
+        String code = "srv-1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), false, new ArrayList<>(), new ArrayList<>(), "P");
+        survey.setVotes(null);
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        assertThrows(SurveyIncompleteException.class, () -> surveyService.getScore(code));
+    }
+
+    @Test
+    @DisplayName("getImageFromSurvey should return image if present")
+    void testGetImageFromSurveySuccess() {
+        String code = "srv-1";
+        Image img = new Image("0", "data:image/jpeg;base64,xyz");
+        Survey survey = new Survey(new Date(), code, List.of(img), false, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        Image result = surveyService.getImageFromSurvey(code, "0");
+        assertNotNull(result);
+        assertEquals("0", result.id());
+    }
+
+    @Test
+    @DisplayName("getImageFromSurvey should throw ImageNotFoundException if image not present")
+    void testGetImageFromSurveyNotFound() {
+        String code = "srv-1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), false, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        assertThrows(ImageNotFoundException.class, () -> surveyService.getImageFromSurvey(code, "99"));
+    }
+
+    @Test
+    @DisplayName("addImageToSurvey should delegate to inMemoryDatabase")
+    void testAddImageToSurvey() {
+        String code = "srv-1";
+        Image image = new Image(null, "content");
+        when(inMemoryDatabase.addImageToSurvey(code, image)).thenReturn("0");
+
+        String id = surveyService.addImageToSurvey(code, image);
+        assertEquals("0", id);
+        verify(inMemoryDatabase).addImageToSurvey(code, image);
+    }
+
+    @Test
+    @DisplayName("deleteSurvey should delete survey when running")
+    void testDeleteSurveySuccess() {
+        String code = "srv-1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), true, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        surveyService.deleteSurvey(code);
+        verify(inMemoryDatabase).removeSurvey(code);
+    }
+
+    @Test
+    @DisplayName("deleteSurvey should throw SurveyStoppedException when stopped")
+    void testDeleteSurveyStopped() {
+        String code = "srv-1";
+        Survey survey = new Survey(new Date(), code, new ArrayList<>(), false, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        assertThrows(SurveyStoppedException.class, () -> surveyService.deleteSurvey(code));
+        verify(inMemoryDatabase, never()).removeSurvey(code);
+    }
+}
