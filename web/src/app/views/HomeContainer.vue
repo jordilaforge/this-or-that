@@ -136,7 +136,6 @@ public async scan() {
                     if (code) {
                         this.surveyCode = code.data
                             .replace(location.origin, '')
-                            .replace('https://baloise.github.io', '')
                             .replace('/this-or-that', '')
                             .replace('/index.html', '')
                             .replace('#/', '')

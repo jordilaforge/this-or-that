@@ -5,7 +5,7 @@
             <div class="container content">
                 <h1>Privacy Policy for ThisOrThat</h1>
 
-                <p>At ThisOrThat, accessible from https://baloise.github.io/this-or-that, one of our main priorities is
+                <p>At ThisOrThat, one of our main priorities is
                     the privacy of our visitors. This Privacy Policy document contains types of information that is
                     collected and recorded by ThisOrThat and how we use it.</p>
 

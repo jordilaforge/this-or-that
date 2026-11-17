@@ -72,7 +72,7 @@
 
 ### Transformation
 ![GitHub](https://i.pinimg.com/600x315/2c/b6/70/2cb670b6ddd8922a1c1b2fee4f6f758c.jpg)
-https://github.com/baloise/this-or-that
+https://github.com/this-or-that/this-or-that
 
 @snapend
 
@@ -81,7 +81,7 @@ https://github.com/baloise/this-or-that
 @snap[midpoint span-80]
 
 ## Code Camp Scope
-- new frontend without baloise branding
+- new standalone frontend
 - app for PlayStore and AppleStore
 - backend with Spring Boot 4.1.2 (Java 25)
 - improve Azure Cloud hosting
@@ -199,8 +199,8 @@ https://github.com/baloise/this-or-that
 ## Azure
 - cloud solution from Microsoft
 - app service based Tomcat 9
-- deployment with ftp (only outside of baloise net)
-- monitoring with the azure portal (only inside baloise net)
+- deployment with ftp
+- monitoring with the azure portal
 
 @snapend
 

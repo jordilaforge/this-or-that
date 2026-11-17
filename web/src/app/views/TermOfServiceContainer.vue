@@ -9,7 +9,7 @@
 
 
             <p>These Terms and Conditions ("Terms", "Terms and Conditions") govern your relationship with
-                https://baloise.github.io/this-or-that website (the "Service") operated by ThisOrThat ("us", "we", or
+                ThisOrThat website (the "Service") operated by ThisOrThat ("us", "we", or
                 "our").</p>
 
             <p>Please read these Terms and Conditions carefully before using the Service.</p>
