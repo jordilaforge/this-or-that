@@ -1,9 +1,7 @@
 const webpack = require('webpack');
 var node_env = process.env.VUE_APP_MODE !== 'development' ? 'production' : 'development';
 module.exports = {
-  publicPath: process.env.NODE_ENV === 'production'
-    ? '/this-or-that/'
-    : '/',
+  publicPath: process.env.PUBLIC_PATH || '/',
   configureWebpack: {
     plugins: [
       new webpack.DefinePlugin({

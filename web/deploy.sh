@@ -1,28 +1,41 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
+set -euo pipefail
 
-# abort on errors
-set -e
+# Deploy frontend to Google Cloud Run
+# Usage: ./deploy.sh [PROJECT_ID] [REGION] [BACKEND_URL]
 
-# update local setup
-yarn install
+PROJECT_ID="${1:-${GCP_PROJECT_ID:-this-or-that-515022}}"
+REGION="${2:-${GCP_REGION:-us-central1}}"
+BACKEND_URL="${3:-${VUE_APP_API_PATH:-https://this-or-that-api-132973189078.us-central1.run.app}}"
+IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/this-or-that/frontend"
 
-# build
-yarn run build
+echo "=== Deploying this-or-that Frontend to Cloud Run ==="
+echo "Project ID:  ${PROJECT_ID}"
+echo "Region:      ${REGION}"
+echo "Backend URL: ${BACKEND_URL}"
+echo "Image:       ${IMAGE}"
 
-# navigate into the build output directory
-cd dist
+# Configure Docker auth
+gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
-# if you are deploying to a custom domain
-# echo 'www.example.com' > CNAME
+# Build Docker image
+docker build \
+  --build-arg VUE_APP_API_PATH="${BACKEND_URL}" \
+  -t "${IMAGE}:latest" \
+  .
 
-git init
-git add -A
-git commit -m 'deploy'
+# Push Docker image
+docker push "${IMAGE}:latest"
 
-# if you are deploying to https://<USERNAME>.github.io
-# git push -f git@github.com:<USERNAME>/<USERNAME>.github.io.git master
+# Deploy to Cloud Run
+gcloud run deploy this-or-that-web \
+  --image "${IMAGE}:latest" \
+  --region "${REGION}" \
+  --project "${PROJECT_ID}" \
+  --port 8080 \
+  --memory 256Mi \
+  --min-instances 0 \
+  --max-instances 2 \
+  --allow-unauthenticated
 
-# if you are deploying to https://<USERNAME>.github.io/<REPO>
-git push -f git@github.com:<USERNAME>/this-or-that.git master:gh-pages
-
-cd -
+echo "=== Deployment complete ==="
