@@ -18,12 +18,14 @@ package org.thisorthat.vote.image.selection;
 import org.thisorthat.db.InMemoryDatabase;
 import org.thisorthat.dto.Image;
 import org.thisorthat.dto.Pair;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Service
+@Primary
+@Service("randomSelectionAlgorithm")
 public class RandomSelectionAlgorithm implements ImageSelectionAlgorithm {
 
     private final InMemoryDatabase inMemoryDatabase;

@@ -31,6 +31,7 @@ public class Survey {
     private List<ScoreItem> scores = new ArrayList<>();
     private List<Vote> votes = new ArrayList<>();
     private String perspective;
+    private VotingMode votingMode;
 
     public Survey() {
     }
@@ -105,6 +106,14 @@ public class Survey {
         this.perspective = perspective;
     }
 
+    public VotingMode getVotingMode() {
+        return votingMode;
+    }
+
+    public void setVotingMode(VotingMode votingMode) {
+        this.votingMode = votingMode;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -116,12 +125,13 @@ public class Survey {
                 Objects.equals(started, survey.started) &&
                 Objects.equals(scores, survey.scores) &&
                 Objects.equals(votes, survey.votes) &&
-                Objects.equals(perspective, survey.perspective);
+                Objects.equals(perspective, survey.perspective) &&
+                votingMode == survey.votingMode;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(creationDate, id, images, started, scores, votes, perspective);
+        return Objects.hash(creationDate, id, images, started, scores, votes, perspective, votingMode);
     }
 
     @Override
@@ -134,6 +144,7 @@ public class Survey {
                 ", scores=" + scores +
                 ", votes=" + votes +
                 ", perspective='" + perspective + '\'' +
+                ", votingMode=" + votingMode +
                 '}';
     }
 }

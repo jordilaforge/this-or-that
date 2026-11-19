@@ -20,13 +20,18 @@ import org.thisorthat.api.dto.ScoreResponse;
 import org.thisorthat.api.dto.VoteRequest;
 import org.thisorthat.api.dto.VoteResponse;
 import org.thisorthat.db.InMemoryDatabase;
+import org.thisorthat.dto.ExhaustiveVoteState;
 import org.thisorthat.dto.Image;
 import org.thisorthat.dto.Survey;
 import org.thisorthat.dto.VoteItem;
+import org.thisorthat.dto.VotingMode;
 import org.thisorthat.exception.*;
 import org.thisorthat.vote.SimpleVoteAlgorithm;
+import org.thisorthat.vote.image.selection.ExhaustiveSelectionAlgorithm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -41,10 +46,37 @@ public class SurveyService {
 
     private final SimpleVoteAlgorithm randomAlgorithm;
 
+    private final ExhaustiveSelectionAlgorithm exhaustiveSelectionAlgorithm;
+
+    private final int exhaustiveThreshold;
+
     public SurveyService(InMemoryDatabase inMemoryDatabase,
-                         SimpleVoteAlgorithm randomAlgorithm) {
+                         SimpleVoteAlgorithm randomAlgorithm,
+                         ExhaustiveSelectionAlgorithm exhaustiveSelectionAlgorithm) {
+        this(inMemoryDatabase, randomAlgorithm, exhaustiveSelectionAlgorithm, 45);
+    }
+
+    @Autowired
+    public SurveyService(InMemoryDatabase inMemoryDatabase,
+                         SimpleVoteAlgorithm randomAlgorithm,
+                         ExhaustiveSelectionAlgorithm exhaustiveSelectionAlgorithm,
+                         @Value("${survey.voting.exhaustive-threshold:45}") int exhaustiveThreshold) {
         this.inMemoryDatabase = inMemoryDatabase;
         this.randomAlgorithm = randomAlgorithm;
+        this.exhaustiveSelectionAlgorithm = exhaustiveSelectionAlgorithm;
+        this.exhaustiveThreshold = exhaustiveThreshold;
+    }
+
+    public int getExhaustiveThreshold() {
+        return exhaustiveThreshold;
+    }
+
+    public VotingMode determineVotingMode(Survey survey) {
+        int imageCount = survey.getImages() != null ? survey.getImages().size() : 0;
+        int totalComparisons = ExhaustiveSelectionAlgorithm.calculateTotalComparisons(imageCount);
+        return (imageCount >= 2 && totalComparisons <= exhaustiveThreshold)
+                ? VotingMode.EXHAUSTIVE
+                : VotingMode.ENDLESS;
     }
 
     public Survey createSurvey(String perspective) {
@@ -60,9 +92,12 @@ public class SurveyService {
 
     public void startSurvey(String surveyCode) {
         checkIfSurveyIsAlreadyStarted(surveyCode);
+        Survey survey = inMemoryDatabase.getSurvey(surveyCode);
+        VotingMode mode = determineVotingMode(survey);
+        survey.setVotingMode(mode);
         inMemoryDatabase.startSurvey(surveyCode);
         randomAlgorithm.initialize(surveyCode);
-        log.info("survey {} started and initialized", surveyCode);
+        log.info("survey {} started in {} mode", surveyCode, mode);
     }
 
     public void stopSurvey(String surveyCode) {
@@ -73,14 +108,46 @@ public class SurveyService {
 
     public VoteResponse getVote(String surveyCode, String userId) {
         checkIfSurveyIsStopped(surveyCode);
-        VoteItem voteItem = randomAlgorithm.getVote(surveyCode, userId);
-        log.info("survey {} get vote from {} image1: {} image2: {}", surveyCode, userId, voteItem.getFile1().getId(), voteItem.getFile2().getId());
-        return new VoteResponse(
-                voteItem.getFile1().getId(),
-                voteItem.getFile2().getId(),
-                true,
-                inMemoryDatabase.getSurvey(surveyCode).getPerspective()
-        );
+        Survey survey = inMemoryDatabase.getSurvey(surveyCode);
+        VotingMode mode = survey.getVotingMode() != null
+                ? survey.getVotingMode()
+                : determineVotingMode(survey);
+
+        if (mode == VotingMode.EXHAUSTIVE) {
+            ExhaustiveVoteState state = exhaustiveSelectionAlgorithm.evaluate(survey, userId);
+            log.info("survey {} (exhaustive) get vote from {} image1: {} image2: {} (progress: {}/{}, completed: {})",
+                    surveyCode, userId,
+                    state.image1() != null ? state.image1().getId() : "null",
+                    state.image2() != null ? state.image2().getId() : "null",
+                    state.completedComparisons(), state.totalComparisons(), state.completed());
+            return new VoteResponse(
+                    state.image1() != null ? state.image1().getId() : null,
+                    state.image2() != null ? state.image2().getId() : null,
+                    true,
+                    survey.getPerspective(),
+                    VotingMode.EXHAUSTIVE,
+                    state.totalComparisons(),
+                    state.completedComparisons(),
+                    state.completed()
+            );
+        } else {
+            VoteItem voteItem = randomAlgorithm.getVote(surveyCode, userId);
+            int userVotes = survey.getVotes() != null ? (int) survey.getVotes().stream()
+                    .filter(v -> userId.equals(v.getUserId()))
+                    .count() : 0;
+            log.info("survey {} (endless) get vote from {} image1: {} image2: {}",
+                    surveyCode, userId, voteItem.getFile1().getId(), voteItem.getFile2().getId());
+            return new VoteResponse(
+                    voteItem.getFile1().getId(),
+                    voteItem.getFile2().getId(),
+                    true,
+                    survey.getPerspective(),
+                    VotingMode.ENDLESS,
+                    null,
+                    userVotes,
+                    false
+            );
+        }
     }
 
     public void setVote(String surveyCode, VoteRequest voteRequest, String userId) {

@@ -16,6 +16,7 @@
 package org.thisorthat.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.thisorthat.dto.VotingMode;
 
 @Schema(description = "Pair of images presented to a user for voting")
 public record VoteResponse(
@@ -26,8 +27,20 @@ public record VoteResponse(
         @Schema(description = "Whether the survey is currently open for voting", example = "true")
         Boolean surveyIsRunning,
         @Schema(description = "Survey perspective/question", example = "Which logo is better?")
-        String perspective
+        String perspective,
+        @Schema(description = "Voting mode: EXHAUSTIVE or ENDLESS", example = "EXHAUSTIVE")
+        VotingMode votingMode,
+        @Schema(description = "Total number of pairwise comparisons (exhaustive mode only)", example = "45")
+        Integer totalComparisons,
+        @Schema(description = "Number of pairwise comparisons completed by this user", example = "5")
+        Integer completedComparisons,
+        @Schema(description = "Whether the user has completed all comparisons in exhaustive mode", example = "false")
+        Boolean completed
 ) {
+    public VoteResponse(String id1, String id2, Boolean surveyIsRunning, String perspective) {
+        this(id1, id2, surveyIsRunning, perspective, VotingMode.ENDLESS, null, 0, false);
+    }
+
     public String getId1() {
         return id1;
     }
@@ -42,5 +55,21 @@ public record VoteResponse(
 
     public String getPerspective() {
         return perspective;
+    }
+
+    public VotingMode getVotingMode() {
+        return votingMode;
+    }
+
+    public Integer getTotalComparisons() {
+        return totalComparisons;
+    }
+
+    public Integer getCompletedComparisons() {
+        return completedComparisons;
+    }
+
+    public Boolean getCompleted() {
+        return completed;
     }
 }

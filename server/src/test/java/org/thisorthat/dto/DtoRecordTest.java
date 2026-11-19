@@ -109,6 +109,17 @@ public class DtoRecordTest {
         assertTrue(res.surveyIsRunning());
         assertEquals("p", res.getPerspective());
         assertEquals("p", res.perspective());
+        assertEquals(VotingMode.ENDLESS, res.getVotingMode());
+        assertEquals(VotingMode.ENDLESS, res.votingMode());
+        assertNull(res.getTotalComparisons());
+        assertEquals(0, res.getCompletedComparisons());
+        assertFalse(res.getCompleted());
+
+        VoteResponse exhaustive = new VoteResponse("1", "2", true, "p", VotingMode.EXHAUSTIVE, 45, 10, false);
+        assertEquals(VotingMode.EXHAUSTIVE, exhaustive.getVotingMode());
+        assertEquals(45, exhaustive.getTotalComparisons());
+        assertEquals(10, exhaustive.getCompletedComparisons());
+        assertFalse(exhaustive.getCompleted());
     }
 
     @Test
@@ -209,11 +220,33 @@ public class DtoRecordTest {
         survey.setVotes(Collections.singletonList(new Vote("1", "2", "u")));
         assertEquals(1, survey.getVotes().size());
 
+        assertNull(survey.getVotingMode());
+        survey.setVotingMode(VotingMode.EXHAUSTIVE);
+        assertEquals(VotingMode.EXHAUSTIVE, survey.getVotingMode());
+
         Survey quickSurvey = new Survey("quick-1", "quick-p");
         assertEquals("quick-1", quickSurvey.getId());
         assertEquals("quick-p", quickSurvey.getPerspective());
         assertNotNull(quickSurvey.getCreationDate());
         assertFalse(quickSurvey.getStarted());
         assertTrue(quickSurvey.getImages().isEmpty());
+    }
+
+    @Test
+    void testExhaustiveVoteStateRecord() {
+        Image img1 = new Image("1", "f1");
+        Image img2 = new Image("2", "f2");
+        ExhaustiveVoteState state = new ExhaustiveVoteState(img1, img2, 45, 10, false);
+
+        assertEquals(img1, state.image1());
+        assertEquals(img2, state.image2());
+        assertEquals(45, state.totalComparisons());
+        assertEquals(10, state.completedComparisons());
+        assertFalse(state.completed());
+
+        ExhaustiveVoteState same = new ExhaustiveVoteState(img1, img2, 45, 10, false);
+        assertEquals(state, same);
+        assertEquals(state.hashCode(), same.hashCode());
+        assertTrue(state.toString().contains("45"));
     }
 }

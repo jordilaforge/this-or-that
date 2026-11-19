@@ -21,6 +21,7 @@ import org.thisorthat.exception.SurveyStoppedException;
 import org.thisorthat.vote.image.selection.ImageSelectionAlgorithm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -36,7 +37,7 @@ public class SimpleVoteAlgorithm implements VoteAlgorithm {
     private final ImageSelectionAlgorithm imageSelectionAlgorithm;
     private final InMemoryDatabase inMemoryDatabase;
 
-    public SimpleVoteAlgorithm(ImageSelectionAlgorithm imageSelectionAlgorithm,
+    public SimpleVoteAlgorithm(@Qualifier("randomSelectionAlgorithm") ImageSelectionAlgorithm imageSelectionAlgorithm,
                                InMemoryDatabase inMemoryDatabase) {
         this.imageSelectionAlgorithm = imageSelectionAlgorithm;
         this.inMemoryDatabase = inMemoryDatabase;
