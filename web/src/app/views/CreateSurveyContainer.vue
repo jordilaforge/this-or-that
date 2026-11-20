@@ -49,6 +49,13 @@
             <hr>
 
             <b-notification
+                    v-if="validImageCount >= 2"
+                    :closable="false"
+                    type="is-info">
+                <strong>Ranking Strategy:</strong> {{ strategyIndicatorText }}
+            </b-notification>
+
+            <b-notification
                     :closable="false"
                     role="alert"
                     type="is-warning">
@@ -138,6 +145,19 @@
             return !!this.perspective && this.images.filter(image => !image.isProcessing).length > 2 && this.checkBox;
         }
 
+        get validImageCount(): number {
+            return this.images.filter(image => !image.isProcessing).length;
+        }
+
+        get strategyIndicatorText(): string {
+            const count = this.validImageCount;
+            if (count <= 10) {
+                const totalPairs = (count * (count - 1)) / 2;
+                return `Exhaustive Mode (Auto-detected for ${count} images: participants will compare all ${totalPairs} unique pairs)`;
+            }
+            return `Adaptive Mode (Auto-detected for ${count} images: Elo-based matchmaking with balanced exposure)`;
+        }
+
         @Watch('imageFiles')
         public fileInput() {
             if (this.imageFiles) {
@@ -161,6 +181,7 @@
             this.isLoading = true;
             const createSurveyRequest: CreateSurveyRequest = {
                 perspective: this.perspective,
+                selectionMode: 'AUTO',
             };
             try {
                 const response = await createSurvey(createSurveyRequest);

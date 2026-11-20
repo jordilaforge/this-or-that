@@ -31,7 +31,8 @@ public class Survey {
     private List<ScoreItem> scores = new ArrayList<>();
     private List<Vote> votes = new ArrayList<>();
     private String perspective;
-    private VotingMode votingMode;
+    private org.thisorthat.vote.image.selection.SelectionMode selectionMode = org.thisorthat.vote.image.selection.SelectionMode.AUTO;
+    private Integer maxComparisonsPerUser;
 
     public Survey() {
     }
@@ -106,12 +107,20 @@ public class Survey {
         this.perspective = perspective;
     }
 
-    public VotingMode getVotingMode() {
-        return votingMode;
+    public org.thisorthat.vote.image.selection.SelectionMode getSelectionMode() {
+        return selectionMode;
     }
 
-    public void setVotingMode(VotingMode votingMode) {
-        this.votingMode = votingMode;
+    public void setSelectionMode(org.thisorthat.vote.image.selection.SelectionMode selectionMode) {
+        this.selectionMode = selectionMode;
+    }
+
+    public Integer getMaxComparisonsPerUser() {
+        return maxComparisonsPerUser;
+    }
+
+    public void setMaxComparisonsPerUser(Integer maxComparisonsPerUser) {
+        this.maxComparisonsPerUser = maxComparisonsPerUser;
     }
 
     @Override
@@ -125,13 +134,12 @@ public class Survey {
                 Objects.equals(started, survey.started) &&
                 Objects.equals(scores, survey.scores) &&
                 Objects.equals(votes, survey.votes) &&
-                Objects.equals(perspective, survey.perspective) &&
-                votingMode == survey.votingMode;
+                Objects.equals(perspective, survey.perspective);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(creationDate, id, images, started, scores, votes, perspective, votingMode);
+        return Objects.hash(creationDate, id, images, started, scores, votes, perspective);
     }
 
     @Override
@@ -144,7 +152,6 @@ public class Survey {
                 ", scores=" + scores +
                 ", votes=" + votes +
                 ", perspective='" + perspective + '\'' +
-                ", votingMode=" + votingMode +
                 '}';
     }
 }

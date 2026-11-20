@@ -1,28 +1,30 @@
-/*
- * Copyright 2018 Baloise Group
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.thisorthat.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.thisorthat.vote.image.selection.SelectionMode;
 
-@Schema(description = "Payload to create a new voting survey")
+@Schema(description = "Payload to create a new survey")
 public record CreateSurveyRequest(
-        @Schema(description = "Question or topic perspective for this survey", example = "Which logo is better?", requiredMode = Schema.RequiredMode.REQUIRED)
-        String perspective
+        @Schema(description = "Question or topic for the survey", example = "Which logo looks better?")
+        String perspective,
+        @Schema(description = "Image selection mode (AUTO, EXHAUSTIVE, ADAPTIVE)", example = "AUTO")
+        SelectionMode selectionMode,
+        @Schema(description = "Maximum comparisons per user for adaptive mode", example = "20")
+        Integer maxComparisonsPerUser
 ) {
+    public CreateSurveyRequest(String perspective) {
+        this(perspective, SelectionMode.AUTO, null);
+    }
+
     public String getPerspective() {
         return perspective;
+    }
+
+    public SelectionMode getSelectionMode() {
+        return selectionMode;
+    }
+
+    public Integer getMaxComparisonsPerUser() {
+        return maxComparisonsPerUser;
     }
 }

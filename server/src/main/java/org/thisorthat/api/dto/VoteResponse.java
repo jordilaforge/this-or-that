@@ -1,22 +1,6 @@
-/*
- * Copyright 2018 Baloise Group
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.thisorthat.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.thisorthat.dto.VotingMode;
 
 @Schema(description = "Pair of images presented to a user for voting")
 public record VoteResponse(
@@ -28,17 +12,15 @@ public record VoteResponse(
         Boolean surveyIsRunning,
         @Schema(description = "Survey perspective/question", example = "Which logo is better?")
         String perspective,
-        @Schema(description = "Voting mode: EXHAUSTIVE or ENDLESS", example = "EXHAUSTIVE")
-        VotingMode votingMode,
-        @Schema(description = "Total number of pairwise comparisons (exhaustive mode only)", example = "45")
-        Integer totalComparisons,
-        @Schema(description = "Number of pairwise comparisons completed by this user", example = "5")
-        Integer completedComparisons,
-        @Schema(description = "Whether the user has completed all comparisons in exhaustive mode", example = "false")
-        Boolean completed
+        @Schema(description = "Whether the participant has finished all assigned comparisons", example = "false")
+        Boolean isParticipantFinished,
+        @Schema(description = "Current comparison index for this participant", example = "1")
+        Integer comparisonIndex,
+        @Schema(description = "Total expected comparisons for this participant", example = "20")
+        Integer totalComparisons
 ) {
     public VoteResponse(String id1, String id2, Boolean surveyIsRunning, String perspective) {
-        this(id1, id2, surveyIsRunning, perspective, VotingMode.ENDLESS, null, 0, false);
+        this(id1, id2, surveyIsRunning, perspective, false, null, null);
     }
 
     public String getId1() {
@@ -57,19 +39,15 @@ public record VoteResponse(
         return perspective;
     }
 
-    public VotingMode getVotingMode() {
-        return votingMode;
+    public Boolean getIsParticipantFinished() {
+        return isParticipantFinished;
+    }
+
+    public Integer getComparisonIndex() {
+        return comparisonIndex;
     }
 
     public Integer getTotalComparisons() {
         return totalComparisons;
-    }
-
-    public Integer getCompletedComparisons() {
-        return completedComparisons;
-    }
-
-    public Boolean getCompleted() {
-        return completed;
     }
 }

@@ -27,6 +27,26 @@
                                     <p class="title">{{score.numberOfVotes}}</p>
                                 </div>
                             </div>
+                            <div class="level-item has-text-centered" v-if="score.selectionMode">
+                                <div>
+                                    <p class="heading">Strategy</p>
+                                    <p class="title is-5">{{score.selectionMode}}</p>
+                                </div>
+                            </div>
+                            <div class="level-item has-text-centered" v-if="score.exposureBalance !== undefined && score.exposureBalance !== null">
+                                <div>
+                                    <p class="heading">Exposure Balance</p>
+                                    <p class="title is-5">{{Math.round(score.exposureBalance * 100)}}%</p>
+                                </div>
+                            </div>
+                            <div class="level-item has-text-centered" v-if="score.isReliable !== undefined && score.isReliable !== null">
+                                <div>
+                                    <p class="heading">Reliability</p>
+                                    <b-tag :type="score.isReliable ? 'is-success' : 'is-warning'" size="is-medium">
+                                        {{score.isReliable ? 'Reliable' : 'Collecting data'}}
+                                    </b-tag>
+                                </div>
+                            </div>
                         </nav>
 
                         <hr>
@@ -36,7 +56,7 @@
                                  :key="item.imageId">
                                 <figure class="image is-square" style="position: relative">
                                     <img :src="getImageURL(item.imageId)" :alt="'Image ' + (index+1)">
-                                    <div class="score has-text-grey">Score: <b>{{item.score}}</b></div>
+                                    <div class="score has-text-grey">Elo: <b>{{item.score}}</b></div>
                                 </figure>
                             </div>
                         </div>

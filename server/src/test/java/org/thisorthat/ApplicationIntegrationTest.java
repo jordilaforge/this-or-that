@@ -182,6 +182,9 @@ class ApplicationIntegrationTest {
         assertEquals(1, scoreResp.getBody().numberOfVotes());
         assertEquals(1, scoreResp.getBody().numberOfUsers());
         assertFalse(scoreResp.getBody().scores().isEmpty());
+        assertEquals(1516, scoreResp.getBody().scores().get(0).score());
+        assertEquals(1484, scoreResp.getBody().scores().get(1).score());
+        assertEquals(org.thisorthat.vote.image.selection.SelectionMode.EXHAUSTIVE, scoreResp.getBody().selectionMode());
 
         // 11. Attempting to delete a stopped survey throws SurveyStoppedException -> returns 400 BAD_REQUEST
         ResponseEntity<String> deleteStoppedResp = restTemplate.exchange(

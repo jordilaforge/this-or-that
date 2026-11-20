@@ -25,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.thisorthat.db.InMemoryDatabase;
 import org.thisorthat.dto.*;
 import org.thisorthat.exception.SurveyStoppedException;
+import org.thisorthat.vote.elo.EloCalculator;
 import org.thisorthat.vote.image.selection.ImageSelectionAlgorithm;
 
 import java.util.ArrayList;
@@ -47,7 +48,7 @@ class SimpleVoteAlgorithmTest {
     private SimpleVoteAlgorithm voteAlgorithm;
 
     @Test
-    @DisplayName("initialize should set initial score of 0 for every image in survey")
+    @DisplayName("initialize should set initial Elo score of 1500 for every image in survey")
     void testInitialize() {
         String code = "survey-1";
         Image img0 = new Image("0", "f0");
@@ -58,8 +59,8 @@ class SimpleVoteAlgorithmTest {
         voteAlgorithm.initialize(code);
 
         assertEquals(2, survey.getScores().size());
-        assertEquals(0, survey.getScores().get(0).score());
-        assertEquals(0, survey.getScores().get(1).score());
+        assertEquals(EloCalculator.DEFAULT_INITIAL_RATING, survey.getScores().get(0).score());
+        assertEquals(EloCalculator.DEFAULT_INITIAL_RATING, survey.getScores().get(1).score());
     }
 
     @Test
@@ -79,9 +80,26 @@ class SimpleVoteAlgorithmTest {
     }
 
     @Test
-    @DisplayName("setVote should persist vote in database")
+    @DisplayName("getVote should return null when participant completed all pairs")
+    void testGetVoteFinished() {
+        String code = "survey-1";
+        String userId = "user-1";
+        when(imageSelectionAlgorithm.getNextImagePair(code, userId)).thenReturn(null);
+
+        VoteItem voteItem = voteAlgorithm.getVote(code, userId);
+
+        assertNull(voteItem);
+    }
+
+    @Test
+    @DisplayName("setVote should persist vote and update live Elo ratings in database")
     void testSetVote() {
         String code = "survey-1";
+        Image img0 = new Image("0", "f0");
+        Image img1 = new Image("1", "f1");
+        Survey survey = new Survey(new Date(), code, List.of(img0, img1), true, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
         voteAlgorithm.setVote(code, "0", "1", "user-1");
 
         ArgumentCaptor<Vote> captor = ArgumentCaptor.forClass(Vote.class);
@@ -90,10 +108,15 @@ class SimpleVoteAlgorithmTest {
         assertEquals("0", persisted.winner());
         assertEquals("1", persisted.loser());
         assertEquals("user-1", persisted.userId());
+
+        ScoreItem score0 = survey.getScores().stream().filter(s -> s.imageId().equals("0")).findFirst().orElseThrow();
+        ScoreItem score1 = survey.getScores().stream().filter(s -> s.imageId().equals("1")).findFirst().orElseThrow();
+        assertEquals(1516, score0.score());
+        assertEquals(1484, score1.score());
     }
 
     @Test
-    @DisplayName("calculateScores should calculate positive and negative weights for 1 vote")
+    @DisplayName("calculateScores should calculate Elo ratings from vote history")
     void testCalculateScoresSingleVote() {
         String code = "survey-1";
         Image img0 = new Image("0", "f0");
@@ -108,33 +131,8 @@ class SimpleVoteAlgorithmTest {
         ScoreItem score0 = scores.stream().filter(s -> s.imageId().equals("0")).findFirst().orElseThrow();
         ScoreItem score1 = scores.stream().filter(s -> s.imageId().equals("1")).findFirst().orElseThrow();
 
-        // 1 vote * 2 <= 2 images -> weight = 10.0
-        assertEquals(10, score0.score());
-        assertEquals(-10, score1.score());
-    }
-
-    @Test
-    @DisplayName("calculateScores should normalize weight when a user votes more times than image count")
-    void testCalculateScoresNormalizedWeight() {
-        String code = "survey-1";
-        Image img0 = new Image("0", "f0");
-        Image img1 = new Image("1", "f1");
-        // 2 votes for 2 images -> votes.size() * 2 = 4 > images.size() (2)
-        // weight per vote = 10.0 * 2 / 4 = 5.0
-        List<Vote> votes = List.of(
-                new Vote("0", "1", "user-1"),
-                new Vote("0", "1", "user-1")
-        );
-        Survey survey = new Survey(new Date(), code, List.of(img0, img1), true, new ArrayList<>(), votes, "P");
-        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
-
-        List<ScoreItem> scores = voteAlgorithm.calculateScores(code);
-
-        ScoreItem score0 = scores.stream().filter(s -> s.imageId().equals("0")).findFirst().orElseThrow();
-        ScoreItem score1 = scores.stream().filter(s -> s.imageId().equals("1")).findFirst().orElseThrow();
-
-        assertEquals(10, score0.score()); // 5.0 + 5.0
-        assertEquals(-10, score1.score()); // -5.0 + -5.0
+        assertEquals(1516, score0.score());
+        assertEquals(1484, score1.score());
     }
 
     @Test

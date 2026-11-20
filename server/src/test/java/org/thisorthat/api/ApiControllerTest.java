@@ -52,7 +52,7 @@ class ApiControllerTest {
     void testCreateSurvey() {
         CreateSurveyRequest req = new CreateSurveyRequest("Perspective A");
         Survey survey = new Survey("code-123", "Perspective A");
-        when(surveyService.createSurvey("Perspective A")).thenReturn(survey);
+        when(surveyService.createSurvey(eq("Perspective A"), any(), any())).thenReturn(survey);
 
         SurveyResponse res = apiController.createSurvey(req);
 

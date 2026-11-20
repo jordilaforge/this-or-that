@@ -15,14 +15,16 @@
  */
 package org.thisorthat.vote;
 
-import org.thisorthat.db.InMemoryDatabase;
-import org.thisorthat.dto.*;
-import org.thisorthat.exception.SurveyStoppedException;
-import org.thisorthat.vote.image.selection.ImageSelectionAlgorithm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import org.thisorthat.db.InMemoryDatabase;
+import org.thisorthat.dto.*;
+import org.thisorthat.exception.SurveyStoppedException;
+import org.thisorthat.vote.elo.EloCalculator;
+import org.thisorthat.vote.elo.EloDelta;
+import org.thisorthat.vote.image.selection.ImageSelectionAlgorithm;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -31,8 +33,6 @@ import java.util.stream.Collectors;
 public class SimpleVoteAlgorithm implements VoteAlgorithm {
 
     private static final Logger log = LoggerFactory.getLogger(SimpleVoteAlgorithm.class);
-
-    private static final double DEFAULT_WEIGHT_PER_VOTE = 10.0;
 
     private final ImageSelectionAlgorithm imageSelectionAlgorithm;
     private final InMemoryDatabase inMemoryDatabase;
@@ -45,51 +45,51 @@ public class SimpleVoteAlgorithm implements VoteAlgorithm {
 
     @Override
     public void initialize(String surveyCode) {
+        Survey survey = inMemoryDatabase.getSurvey(surveyCode);
         List<ScoreItem> scores = new ArrayList<>();
-        inMemoryDatabase.getSurvey(surveyCode).getImages().forEach(image -> {
-            ScoreItem score = new ScoreItem(image.getId(), 0);
-            scores.add(score);
-        });
-        inMemoryDatabase.getSurvey(surveyCode).setScores(scores);
-        log.info("Initialized survey {} with empty scores", inMemoryDatabase.getSurvey(surveyCode).getId());
+        survey.getImages().forEach(image -> scores.add(new ScoreItem(image.getId(), EloCalculator.DEFAULT_INITIAL_RATING)));
+        survey.setScores(scores);
+        log.info("Initialized survey {} with initial Elo score {}", survey.getId(), EloCalculator.DEFAULT_INITIAL_RATING);
     }
 
     @Override
     public VoteItem getVote(String surveyCode, String userId) {
         Pair<Image> images = imageSelectionAlgorithm.getNextImagePair(surveyCode, userId);
+        if (images == null) {
+            return null;
+        }
         return new VoteItem(images.getT1(), images.getT2());
     }
 
     @Override
     public void setVote(String surveyCode, String imageIdWinner, String imageIdLooser, String userId) {
+        Survey survey = inMemoryDatabase.getSurvey(surveyCode);
+        applyLiveVote(survey, imageIdWinner, imageIdLooser);
         inMemoryDatabase.persistVote(surveyCode, new Vote(imageIdWinner, imageIdLooser, userId));
         log.info("voted for {} winner {} looser {}", surveyCode, imageIdWinner, imageIdLooser);
     }
 
     @Override
     public List<ScoreItem> calculateScores(String surveyCode) {
-        log.info("ENTRY calculateScore(surveyCode={})", surveyCode);
         Survey survey = inMemoryDatabase.getSurvey(surveyCode);
-        Set<String> usersIds = survey.getVotes().stream().map(Vote::getUserId).collect(Collectors.toSet());
-        Map<String, Double> imageScores = new HashMap<>();
+        Map<String, Double> ratings = new HashMap<>();
 
-        for (String userId : usersIds) {
-            List<Vote> votes = survey.getVotes().stream()
-                    .filter(v -> v.getUserId().equals(userId)).collect(Collectors.toList());
-            double weight = getWeight(survey, userId);
-            votes.forEach(v -> {
-                imageScores.putIfAbsent(v.getLoser(), 0.0);
-                imageScores.putIfAbsent(v.getWinner(), 0.0);
-                imageScores.put(v.getLoser(), imageScores.get(v.getLoser()) - weight);
-                imageScores.put(v.getWinner(), imageScores.get(v.getWinner()) + weight);
-            });
+        for (Image image : survey.getImages()) {
+            ratings.put(image.getId(), (double) EloCalculator.DEFAULT_INITIAL_RATING);
         }
 
-        final List<ScoreItem> list = imageScores.keySet().stream()
-                .map(imageId -> new ScoreItem(imageId, imageScores.get(imageId).intValue()))
+        for (Vote vote : survey.getVotes()) {
+            double currentWinner = ratings.getOrDefault(vote.getWinner(), (double) EloCalculator.DEFAULT_INITIAL_RATING);
+            double currentLoser = ratings.getOrDefault(vote.getLoser(), (double) EloCalculator.DEFAULT_INITIAL_RATING);
+            EloDelta delta = EloCalculator.calculate(currentWinner, currentLoser, EloCalculator.DEFAULT_K_FACTOR);
+            ratings.put(vote.getWinner(), delta.newWinnerRating());
+            ratings.put(vote.getLoser(), delta.newLoserRating());
+        }
+
+        return ratings.entrySet().stream()
+                .map(entry -> new ScoreItem(entry.getKey(), (int) Math.round(entry.getValue())))
+                .sorted((a, b) -> Integer.compare(b.score(), a.score()))
                 .collect(Collectors.toList());
-        log.info("EXIT calculateScore(scores={})", list);
-        return list;
     }
 
     public void calculateScoresAndStopSurvey(String surveyCode) {
@@ -101,16 +101,25 @@ public class SimpleVoteAlgorithm implements VoteAlgorithm {
         inMemoryDatabase.stopSurvey(surveyCode);
     }
 
-    /**
-     * The weight of a users vote is normalized to the number of images
-     */
-    private double getWeight(Survey survey, String userId) {
-        List<Vote> votes = survey.getVotes().stream()
-                .filter(v -> v.getUserId().equals(userId)).collect(Collectors.toList());
-        if ((votes.size() * 2) <= survey.getImages().size()) { // if votes * 2 are less or equal than number of images each picture has been evaluated once at max!
-            return DEFAULT_WEIGHT_PER_VOTE;
+    private void applyLiveVote(Survey survey, String winnerId, String loserId) {
+        Map<String, Integer> scoreMap = new HashMap<>();
+        if (survey.getScores() != null) {
+            for (ScoreItem item : survey.getScores()) {
+                scoreMap.put(item.getImageId(), item.getScore());
+            }
         }
-        return DEFAULT_WEIGHT_PER_VOTE * (double) (survey.getImages().size()) / (double) (votes.size() * 2);
-    }
 
+        int winnerScore = scoreMap.getOrDefault(winnerId, EloCalculator.DEFAULT_INITIAL_RATING);
+        int loserScore = scoreMap.getOrDefault(loserId, EloCalculator.DEFAULT_INITIAL_RATING);
+
+        EloDelta delta = EloCalculator.calculate(winnerScore, loserScore, EloCalculator.DEFAULT_K_FACTOR);
+        scoreMap.put(winnerId, (int) Math.round(delta.newWinnerRating()));
+        scoreMap.put(loserId, (int) Math.round(delta.newLoserRating()));
+
+        List<ScoreItem> updatedScores = scoreMap.entrySet().stream()
+                .map(entry -> new ScoreItem(entry.getKey(), entry.getValue()))
+                .sorted((a, b) -> Integer.compare(b.score(), a.score()))
+                .collect(Collectors.toList());
+        survey.setScores(updatedScores);
+    }
 }

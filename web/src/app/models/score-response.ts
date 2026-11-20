@@ -6,4 +6,8 @@ export class ScoreResponse {
     public perspective?: string;
     public numberOfVotes?: number;
     public numberOfUsers?: number;
+    public isReliable?: boolean;
+    public exposureBalance?: number;
+    public minComparisonsPerImage?: number;
+    public selectionMode?: string;
 }

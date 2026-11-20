@@ -1,37 +1,35 @@
-/*
- * Copyright 2018 Baloise Group
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.thisorthat.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.thisorthat.vote.image.selection.SelectionMode;
 
 import java.util.List;
 
-@Schema(description = "Survey score results and statistics")
+@Schema(description = "Current or final scores and statistics for a survey")
 public record ScoreResponse(
-        @Schema(description = "List of image scores ordered from highest to lowest")
+        @Schema(description = "List of image scores sorted descending")
         List<Score> scores,
-        @Schema(description = "Whether the survey is currently active", example = "false")
+        @Schema(description = "Whether the survey is currently open for voting", example = "false")
         Boolean surveyIsRunning,
-        @Schema(description = "Perspective / question of the survey", example = "Which logo is better?")
+        @Schema(description = "Survey perspective/question", example = "Which logo is better?")
         String perspective,
-        @Schema(description = "Total number of votes registered", example = "10")
+        @Schema(description = "Total number of votes cast", example = "42")
         Integer numberOfVotes,
-        @Schema(description = "Total number of unique users who voted", example = "3")
-        Integer numberOfUsers
+        @Schema(description = "Total number of unique participants", example = "5")
+        Integer numberOfUsers,
+        @Schema(description = "Whether ranking data is deemed statistically reliable", example = "true")
+        Boolean isReliable,
+        @Schema(description = "Exposure balance ratio across images (min / max comparisons)", example = "0.85")
+        Double exposureBalance,
+        @Schema(description = "Minimum comparison count for any single image", example = "15")
+        Integer minComparisonsPerImage,
+        @Schema(description = "Active image selection mode for the survey", example = "EXHAUSTIVE")
+        SelectionMode selectionMode
 ) {
+    public ScoreResponse(List<Score> scores, Boolean surveyIsRunning, String perspective, Integer numberOfVotes, Integer numberOfUsers) {
+        this(scores, surveyIsRunning, perspective, numberOfVotes, numberOfUsers, null, null, null, null);
+    }
+
     public List<Score> getScores() {
         return scores;
     }
@@ -50,5 +48,21 @@ public record ScoreResponse(
 
     public Integer getNumberOfUsers() {
         return numberOfUsers;
+    }
+
+    public Boolean getIsReliable() {
+        return isReliable;
+    }
+
+    public Double getExposureBalance() {
+        return exposureBalance;
+    }
+
+    public Integer getMinComparisonsPerImage() {
+        return minComparisonsPerImage;
+    }
+
+    public SelectionMode getSelectionMode() {
+        return selectionMode;
     }
 }

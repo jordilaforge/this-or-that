@@ -14,9 +14,7 @@
                             <span class="title"
                                   v-if="voteResponse"
                                   style="margin-bottom: 0; white-space: nowrap;overflow: hidden; text-overflow: ellipsis;">
-                                {{ voteResponse.perspective }}
-                                <small v-if="isExhaustive">({{ voteResponse.completedComparisons }}/{{ voteResponse.totalComparisons }} Comparisons, SurveyCode: {{ $route.params.surveyCode }})</small>
-                                <small v-else>(Votes: {{ submittedVotes }} SurveyCode: {{ $route.params.surveyCode }})</small>
+                                {{ voteResponse.perspective }} <small>(Comparison {{ progressText }} &bull; SurveyCode: {{this.$route.params.surveyCode}})</small>
                             </span>
                         </div>
                     </div>
@@ -24,29 +22,7 @@
             </div>
             <div class="hero-body">
                 <div class="container has-text-centered">
-
-                    <!-- Progress bar in exhaustive mode -->
-                    <div v-if="isExhaustive && !isSurveyStopped" class="progress-wrapper columns is-centered">
-                        <div class="column is-three-quarters-tablet is-half-desktop">
-                            <b-progress
-                                type="is-success"
-                                size="is-medium"
-                                :value="voteResponse.completedComparisons"
-                                :max="voteResponse.totalComparisons"
-                                show-value
-                                format="percent">
-                            </b-progress>
-                            <p class="has-text-white is-size-6 mt-1" v-if="!isCompleted">
-                                Comparison {{ currentComparisonNumber }} of {{ voteResponse.totalComparisons }}
-                            </p>
-                            <p class="has-text-white is-size-6 mt-1" v-else>
-                                All {{ voteResponse.totalComparisons }} comparisons completed (100%)
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Images for voting -->
-                    <div v-if="voteResponse && voteResponse.id1 != null && !isSurveyStopped && !isCompleted">
+                    <div v-if="voteResponse && voteResponse.id1 != null && !isOver && !voteResponse.isParticipantFinished">
                         <div class="image-container columns is-centered" :class="isLandscape ? 'is-mobile':''">
                             <div class="column is-half">
                                 <VoteImage :src="getImageURL1()" @click.native="vote(1)"></VoteImage>
@@ -57,12 +33,11 @@
                         </div>
                     </div>
 
-                    <!-- Exhaustive Mode: All comparisons completed -->
                     <div class="columns is-centered has-text-centered"
-                         v-if="isCompleted">
-                        <div class="column">
-                            <h1 class="title">All comparisons done! 🎉</h1>
-                            <h1 class="subtitle">You have completed all image comparisons for this survey. Thank you for voting!</h1>
+                         v-if="isOver || (voteResponse && (voteResponse.id1 == null || voteResponse.isParticipantFinished))">
+                        <div class="column" v-if="voteResponse && voteResponse.isParticipantFinished && !isOver">
+                            <h1 class="title">All comparisons completed!</h1>
+                            <h1 class="subtitle">Thank you for voting. You have completed all comparisons for this survey.</h1>
 
                             <b-button type="is-info"
                                       size="is-medium"
@@ -71,12 +46,7 @@
                                 View survey results
                             </b-button>
                         </div>
-                    </div>
-
-                    <!-- Survey Stopped / Finished -->
-                    <div class="columns is-centered has-text-centered"
-                         v-if="isSurveyStopped && !isCompleted">
-                        <div class="column">
+                        <div class="column" v-else>
                             <h1 class="title">Its over ...</h1>
                             <h1 class="subtitle">... survey has already finished, but you can view the results</h1>
 
@@ -114,37 +84,15 @@
         public voteResponse: VoteResponse | null = null;
         public submittedVotes: number = 0;
 
-        public get isExhaustive(): boolean {
-            return !!(
-                this.voteResponse &&
-                this.voteResponse.votingMode === 'EXHAUSTIVE' &&
-                this.voteResponse.totalComparisons != null &&
-                this.voteResponse.totalComparisons > 0
-            );
-        }
-
-        public get isCompleted(): boolean {
-            return !!(
-                this.voteResponse &&
-                (this.voteResponse.completed === true ||
-                    (this.isExhaustive && this.voteResponse.id1 == null))
-            );
-        }
-
-        public get isSurveyStopped(): boolean {
-            return this.isOver || (!!this.voteResponse && this.voteResponse.id1 == null && !this.isCompleted);
-        }
-
-        public get currentComparisonNumber(): number {
-            if (!this.voteResponse || this.voteResponse.completedComparisons == null) {
-                return 1;
+        get progressText(): string {
+            if (this.voteResponse && this.voteResponse.comparisonIndex && this.voteResponse.totalComparisons) {
+                return `${this.voteResponse.comparisonIndex} of ${this.voteResponse.totalComparisons}`;
             }
-            const total = this.voteResponse.totalComparisons || 1;
-            return Math.min(this.voteResponse.completedComparisons + 1, total);
+            return `${this.submittedVotes}`;
         }
 
         public getImageURL1() {
-            if (this.voteResponse != null && this.voteResponse.id1 != null) {
+            if (this.voteResponse != null) {
                 return getImageURL(
                     this.$route.params.surveyCode,
                     this.voteResponse.id1,
@@ -154,7 +102,7 @@
         }
 
         public getImageURL2() {
-            if (this.voteResponse != null && this.voteResponse.id2 != null) {
+            if (this.voteResponse != null) {
                 return getImageURL(
                     this.$route.params.surveyCode,
                     this.voteResponse.id2,
@@ -209,7 +157,7 @@
         public async vote(selectedImage: number) {
             this.isLoading = true;
             try {
-                if (this.voteResponse != null && this.voteResponse.id1 != null && this.voteResponse.id2 != null) {
+                if (this.voteResponse != null) {
                     const winner =
                         selectedImage === 1
                             ? this.voteResponse.id1
@@ -269,10 +217,6 @@
         padding: 1.5rem;
     }
 
-    .progress-wrapper {
-        margin-bottom: 1.5rem;
-    }
-
     .image-container {
         .column {
             justify-content: center;
@@ -293,3 +237,4 @@
         }
     }
 </style>
+

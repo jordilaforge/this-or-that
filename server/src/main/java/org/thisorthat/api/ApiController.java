@@ -58,7 +58,11 @@ public class ApiController {
             @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Details for the survey to be created", required = true)
             @RequestBody CreateSurveyRequest createSurveyRequest) {
         try {
-            Survey survey = surveyService.createSurvey(createSurveyRequest.getPerspective());
+            Survey survey = surveyService.createSurvey(
+                    createSurveyRequest.getPerspective(),
+                    createSurveyRequest.getSelectionMode(),
+                    createSurveyRequest.getMaxComparisonsPerUser()
+            );
             return new SurveyResponse(survey.getId());
         } catch (Exception e) {
             throw buildError(e);
