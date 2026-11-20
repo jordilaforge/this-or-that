@@ -15,24 +15,9 @@
  */
 package org.thisorthat.vote.image.selection;
 
-import org.thisorthat.dto.ExhaustiveVoteState;
 import org.thisorthat.dto.Image;
 import org.thisorthat.dto.Pair;
-import org.thisorthat.dto.Survey;
 
 public interface ImageSelectionAlgorithm {
-
     Pair<Image> getNextImagePair(String surveyCode, String userId);
-
-    default ExhaustiveVoteState getVoteState(String surveyCode, String userId) {
-        Pair<Image> pair = getNextImagePair(surveyCode, userId);
-        if (pair == null) {
-            return new ExhaustiveVoteState(null, null, 0, 0, true);
-        }
-        return new ExhaustiveVoteState(pair.getT1(), pair.getT2(), 0, 0, false);
-    }
-
-    default ExhaustiveVoteState getVoteState(Survey survey, String userId) {
-        return getVoteState(survey.getId(), userId);
-    }
 }
