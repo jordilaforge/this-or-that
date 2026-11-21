@@ -15,11 +15,11 @@
  */
 package org.thisorthat.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +30,7 @@ import org.thisorthat.db.InMemoryDatabase;
 import org.thisorthat.dto.*;
 import org.thisorthat.exception.*;
 import org.thisorthat.vote.SimpleVoteAlgorithm;
+import org.thisorthat.vote.image.selection.ExhaustiveSelectionAlgorithm;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -47,11 +48,18 @@ class SurveyServiceTest {
     @Mock
     private SimpleVoteAlgorithm randomAlgorithm;
 
+    @Mock
+    private ExhaustiveSelectionAlgorithm exhaustiveSelectionAlgorithm;
+
     @Spy
     private CampaignQualityService campaignQualityService = new CampaignQualityService();
 
-    @InjectMocks
     private SurveyService surveyService;
+
+    @BeforeEach
+    void setUp() {
+        surveyService = new SurveyService(inMemoryDatabase, randomAlgorithm, campaignQualityService, exhaustiveSelectionAlgorithm, 45);
+    }
 
     @Test
     @DisplayName("createSurvey should generate code and save survey to database")
@@ -118,11 +126,12 @@ class SurveyServiceTest {
     }
 
     @Test
-    @DisplayName("getVote should return VoteResponse when survey is running")
+    @DisplayName("getVote should return VoteResponse when survey is running in endless mode")
     void testGetVoteSuccess() {
         String code = "srv-1";
         String userId = "user-1";
         Survey survey = new Survey(new Date(), code, new ArrayList<>(), true, new ArrayList<>(), new ArrayList<>(), "Perspective");
+        survey.setVotingMode(VotingMode.ENDLESS);
         when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
 
         Image img1 = new Image("0", "file0");
@@ -136,14 +145,16 @@ class SurveyServiceTest {
         assertEquals("1", response.id2());
         assertTrue(response.surveyIsRunning());
         assertEquals("Perspective", response.perspective());
+        assertEquals(VotingMode.ENDLESS, response.votingMode());
     }
 
     @Test
-    @DisplayName("getVote should return participant finished when no further pairs available")
+    @DisplayName("getVote in endless mode should return participant finished when limit reached and null pairs")
     void testGetVoteParticipantFinished() {
         String code = "srv-1";
         String userId = "user-1";
         Survey survey = new Survey(new Date(), code, new ArrayList<>(), true, new ArrayList<>(), new ArrayList<>(), "Perspective");
+        survey.setVotingMode(VotingMode.ENDLESS);
         when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
         when(randomAlgorithm.getVote(code, userId)).thenReturn(null);
 
@@ -153,6 +164,94 @@ class SurveyServiceTest {
         assertNull(response.id1());
         assertNull(response.id2());
         assertTrue(response.getIsParticipantFinished());
+    }
+
+    @Test
+    @DisplayName("determineVotingMode should return EXHAUSTIVE when comparisons <= threshold")
+    void testDetermineVotingModeExhaustive() {
+        List<Image> images = List.of(
+                new Image("0", "f0"),
+                new Image("1", "f1"),
+                new Image("2", "f2"),
+                new Image("3", "f3"),
+                new Image("4", "f4")
+        );
+        Survey survey = new Survey(new Date(), "srv-1", images, false, new ArrayList<>(), new ArrayList<>(), "P");
+        assertEquals(VotingMode.EXHAUSTIVE, surveyService.determineVotingMode(survey));
+    }
+
+    @Test
+    @DisplayName("determineVotingMode should return ENDLESS when comparisons > threshold")
+    void testDetermineVotingModeEndless() {
+        List<Image> images = new ArrayList<>();
+        for (int i = 0; i < 11; i++) {
+            images.add(new Image(String.valueOf(i), "f" + i));
+        }
+        Survey survey = new Survey(new Date(), "srv-1", images, false, new ArrayList<>(), new ArrayList<>(), "P");
+        assertEquals(VotingMode.ENDLESS, surveyService.determineVotingMode(survey));
+    }
+
+    @Test
+    @DisplayName("getVote in EXHAUSTIVE mode should return progress and pairs from ExhaustiveSelectionAlgorithm")
+    void testGetVoteExhaustiveMode() {
+        String code = "srv-ex";
+        String userId = "user-1";
+        List<Image> images = List.of(new Image("0", "f0"), new Image("1", "f1"), new Image("2", "f2"));
+        Survey survey = new Survey(new Date(), code, images, true, new ArrayList<>(), new ArrayList<>(), "P");
+        survey.setVotingMode(VotingMode.EXHAUSTIVE);
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        when(exhaustiveSelectionAlgorithm.evaluate(survey, userId))
+                .thenReturn(new ExhaustiveVoteState(new Image("0", "f0"), new Image("1", "f1"), 3, 1, false));
+
+        VoteResponse response = surveyService.getVote(code, userId);
+
+        assertNotNull(response);
+        assertEquals(VotingMode.EXHAUSTIVE, response.votingMode());
+        assertEquals("0", response.id1());
+        assertEquals("1", response.id2());
+        assertEquals(3, response.totalComparisons());
+        assertEquals(1, response.completedComparisons());
+        assertFalse(response.completed());
+    }
+
+    @Test
+    @DisplayName("getVote in EXHAUSTIVE mode when completed should return completed flag and null IDs")
+    void testGetVoteExhaustiveModeCompleted() {
+        String code = "srv-ex";
+        String userId = "user-1";
+        List<Image> images = List.of(new Image("0", "f0"), new Image("1", "f1"), new Image("2", "f2"));
+        Survey survey = new Survey(new Date(), code, images, true, new ArrayList<>(), new ArrayList<>(), "P");
+        survey.setVotingMode(VotingMode.EXHAUSTIVE);
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        when(exhaustiveSelectionAlgorithm.evaluate(survey, userId))
+                .thenReturn(new ExhaustiveVoteState(null, null, 3, 3, true));
+
+        VoteResponse response = surveyService.getVote(code, userId);
+
+        assertNotNull(response);
+        assertEquals(VotingMode.EXHAUSTIVE, response.votingMode());
+        assertNull(response.id1());
+        assertNull(response.id2());
+        assertEquals(3, response.totalComparisons());
+        assertEquals(3, response.completedComparisons());
+        assertTrue(response.completed());
+    }
+
+    @Test
+    @DisplayName("startSurvey should set votingMode on survey")
+    void testStartSurveySetsVotingMode() {
+        String code = "srv-start";
+        List<Image> images = List.of(new Image("0", "f0"), new Image("1", "f1"));
+        Survey survey = new Survey(new Date(), code, images, false, new ArrayList<>(), new ArrayList<>(), "P");
+        when(inMemoryDatabase.getSurvey(code)).thenReturn(survey);
+
+        surveyService.startSurvey(code);
+
+        assertEquals(VotingMode.EXHAUSTIVE, survey.getVotingMode());
+        verify(inMemoryDatabase).startSurvey(code);
+        verify(randomAlgorithm).initialize(code);
     }
 
     @Test
@@ -214,7 +313,6 @@ class SurveyServiceTest {
         assertEquals(3, response.numberOfVotes());
         assertEquals(2, response.numberOfUsers()); // u1, u2
         assertEquals(2, response.scores().size());
-        // Should be sorted descending by score: img1 (20) first, then img0 (5)
         assertEquals("1", response.scores().get(0).imageId());
         assertEquals(20, response.scores().get(0).score());
         assertEquals("0", response.scores().get(1).imageId());

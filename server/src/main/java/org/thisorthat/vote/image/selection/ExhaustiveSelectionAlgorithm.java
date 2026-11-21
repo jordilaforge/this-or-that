@@ -2,29 +2,86 @@ package org.thisorthat.vote.image.selection;
 
 import org.springframework.stereotype.Component;
 import org.thisorthat.db.InMemoryDatabase;
-import org.thisorthat.dto.Image;
-import org.thisorthat.dto.Pair;
-import org.thisorthat.dto.Survey;
-import org.thisorthat.dto.Vote;
+import org.thisorthat.dto.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
-@Component
+@Component("exhaustiveSelectionAlgorithm")
 public class ExhaustiveSelectionAlgorithm implements ImageSelectionAlgorithm {
 
     private final InMemoryDatabase inMemoryDatabase;
     private final Random random = new Random();
 
+    public ExhaustiveSelectionAlgorithm() {
+        this(null);
+    }
+
     public ExhaustiveSelectionAlgorithm(InMemoryDatabase inMemoryDatabase) {
         this.inMemoryDatabase = inMemoryDatabase;
     }
 
-    @Override
-    public Pair<Image> getNextImagePair(String surveyCode, String userId) {
-        Survey survey = inMemoryDatabase.getSurvey(surveyCode);
-        List<Image> images = survey.getImages();
+    public static int calculateTotalComparisons(int imageCount) {
+        if (imageCount < 2) {
+            return 0;
+        }
+        return (imageCount * (imageCount - 1)) / 2;
+    }
+
+    public static String buildPairKey(String idA, String idB) {
+        if (idA == null || idB == null) {
+            return "";
+        }
+        return idA.compareTo(idB) <= 0 ? idA + ":" + idB : idB + ":" + idA;
+    }
+
+    public static String canonicalPairKey(String id1, String id2) {
+        return buildPairKey(id1, id2);
+    }
+
+    public static Set<String> getSeenPairKeysForUser(Survey survey, String userId) {
+        Set<String> keys = new HashSet<>();
+        if (survey != null && survey.getVotes() != null && userId != null) {
+            for (Vote vote : survey.getVotes()) {
+                if (userId.equals(vote.getUserId())) {
+                    keys.add(buildPairKey(vote.getWinner(), vote.getLoser()));
+                }
+            }
+        }
+        return keys;
+    }
+
+    public static Set<String> getVotedPairKeys(List<Vote> votes, String userId) {
+        if (votes == null || votes.isEmpty() || userId == null) {
+            return Collections.emptySet();
+        }
+        return votes.stream()
+                .filter(v -> userId.equals(v.getUserId()))
+                .map(v -> buildPairKey(v.getWinner(), v.getLoser()))
+                .collect(Collectors.toSet());
+    }
+
+    public static List<Pair<Image>> generateAllPairs(List<Image> images) {
+        List<Pair<Image>> pairs = new ArrayList<>();
         if (images == null || images.size() < 2) {
-            return null;
+            return pairs;
+        }
+        for (int i = 0; i < images.size() - 1; i++) {
+            for (int j = i + 1; j < images.size(); j++) {
+                pairs.add(new Pair<>(images.get(i), images.get(j)));
+            }
+        }
+        return pairs;
+    }
+
+    public ExhaustiveVoteState evaluate(Survey survey, String userId) {
+        if (survey == null) {
+            return new ExhaustiveVoteState(null, null, 0, 0, true);
+        }
+        List<Image> images = survey.getImages() != null ? survey.getImages() : Collections.emptyList();
+        int totalComparisons = calculateTotalComparisons(images.size());
+        if (images.size() < 2) {
+            return new ExhaustiveVoteState(null, null, totalComparisons, 0, true);
         }
 
         Set<String> seenPairKeys = getSeenPairKeysForUser(survey, userId);
@@ -41,30 +98,45 @@ public class ExhaustiveSelectionAlgorithm implements ImageSelectionAlgorithm {
             }
         }
 
+        int completedComparisons = totalComparisons - unseenPairs.size();
+
         if (unseenPairs.isEmpty()) {
-            return null;
+            return new ExhaustiveVoteState(null, null, totalComparisons, totalComparisons, true);
         }
 
         Pair<Image> chosenPair = unseenPairs.get(random.nextInt(unseenPairs.size()));
+        Image img1 = chosenPair.getT1();
+        Image img2 = chosenPair.getT2();
         if (random.nextBoolean()) {
-            return new Pair<>(chosenPair.getT2(), chosenPair.getT1());
+            img1 = chosenPair.getT2();
+            img2 = chosenPair.getT1();
         }
-        return chosenPair;
+
+        return new ExhaustiveVoteState(img1, img2, totalComparisons, completedComparisons, false);
     }
 
-    public static String buildPairKey(String idA, String idB) {
-        return idA.compareTo(idB) <= 0 ? idA + ":" + idB : idB + ":" + idA;
+    public ExhaustiveVoteState getVoteState(String surveyCode, String userId) {
+        if (inMemoryDatabase == null) {
+            throw new IllegalStateException("InMemoryDatabase is required to evaluate by surveyCode");
+        }
+        Survey survey = inMemoryDatabase.getSurvey(surveyCode);
+        return evaluate(survey, userId);
     }
 
-    public static Set<String> getSeenPairKeysForUser(Survey survey, String userId) {
-        Set<String> keys = new HashSet<>();
-        if (survey.getVotes() != null && userId != null) {
-            for (Vote vote : survey.getVotes()) {
-                if (userId.equals(vote.getUserId())) {
-                    keys.add(buildPairKey(vote.getWinner(), vote.getLoser()));
-                }
-            }
+    public ExhaustiveVoteState getVoteState(Survey survey, String userId) {
+        return evaluate(survey, userId);
+    }
+
+    @Override
+    public Pair<Image> getNextImagePair(String surveyCode, String userId) {
+        if (inMemoryDatabase == null) {
+            return null;
         }
-        return keys;
+        Survey survey = inMemoryDatabase.getSurvey(surveyCode);
+        ExhaustiveVoteState state = evaluate(survey, userId);
+        if (state.completed() || state.image1() == null || state.image2() == null) {
+            return null;
+        }
+        return new Pair<>(state.image1(), state.image2());
     }
 }

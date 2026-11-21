@@ -109,6 +109,24 @@ public class DtoRecordTest {
         assertTrue(res.surveyIsRunning());
         assertEquals("p", res.getPerspective());
         assertEquals("p", res.perspective());
+
+        VoteResponse resFull = new VoteResponse("1", "2", true, "p", VotingMode.EXHAUSTIVE, 10, 3, false);
+        assertEquals(VotingMode.EXHAUSTIVE, resFull.getVotingMode());
+        assertEquals(10, resFull.getTotalComparisons());
+        assertEquals(3, resFull.getCompletedComparisons());
+        assertFalse(resFull.getCompleted());
+    }
+
+    @Test
+    void testExhaustiveVoteStateRecord() {
+        Image img1 = new Image("1", "f1");
+        Image img2 = new Image("2", "f2");
+        ExhaustiveVoteState state = new ExhaustiveVoteState(img1, img2, 10, 4, false);
+        assertEquals(img1, state.image1());
+        assertEquals(img2, state.image2());
+        assertEquals(10, state.totalComparisons());
+        assertEquals(4, state.completedComparisons());
+        assertFalse(state.completed());
     }
 
     @Test

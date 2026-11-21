@@ -37,7 +37,7 @@ public class SimpleVoteAlgorithm implements VoteAlgorithm {
     private final ImageSelectionAlgorithm imageSelectionAlgorithm;
     private final InMemoryDatabase inMemoryDatabase;
 
-    public SimpleVoteAlgorithm(@Qualifier("randomSelectionAlgorithm") ImageSelectionAlgorithm imageSelectionAlgorithm,
+    public SimpleVoteAlgorithm(ImageSelectionAlgorithm imageSelectionAlgorithm,
                                InMemoryDatabase inMemoryDatabase) {
         this.imageSelectionAlgorithm = imageSelectionAlgorithm;
         this.inMemoryDatabase = inMemoryDatabase;

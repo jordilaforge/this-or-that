@@ -33,6 +33,7 @@ public class Survey {
     private String perspective;
     private org.thisorthat.vote.image.selection.SelectionMode selectionMode = org.thisorthat.vote.image.selection.SelectionMode.AUTO;
     private Integer maxComparisonsPerUser;
+    private VotingMode votingMode;
 
     public Survey() {
     }
@@ -121,6 +122,14 @@ public class Survey {
 
     public void setMaxComparisonsPerUser(Integer maxComparisonsPerUser) {
         this.maxComparisonsPerUser = maxComparisonsPerUser;
+    }
+
+    public VotingMode getVotingMode() {
+        return votingMode;
+    }
+
+    public void setVotingMode(VotingMode votingMode) {
+        this.votingMode = votingMode;
     }
 
     @Override

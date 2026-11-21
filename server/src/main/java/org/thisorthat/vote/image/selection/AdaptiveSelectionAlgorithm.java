@@ -30,40 +30,42 @@ public class AdaptiveSelectionAlgorithm implements ImageSelectionAlgorithm {
             return null;
         }
 
-        int maxComparisons = survey.getMaxComparisonsPerUser() != null
-                ? survey.getMaxComparisonsPerUser()
-                : DEFAULT_MAX_COMPARISONS_PER_USER;
+        if (survey.getMaxComparisonsPerUser() != null) {
+            long userVoteCount = survey.getVotes().stream()
+                    .filter(vote -> userId.equals(vote.getUserId()))
+                    .count();
 
-        long userVoteCount = survey.getVotes().stream()
-                .filter(vote -> userId.equals(vote.getUserId()))
-                .count();
-
-        if (userVoteCount >= maxComparisons) {
-            return null;
+            if (userVoteCount >= survey.getMaxComparisonsPerUser()) {
+                return null;
+            }
         }
 
         Set<String> seenPairKeys = ExhaustiveSelectionAlgorithm.getSeenPairKeysForUser(survey, userId);
+        List<Pair<Image>> allPairs = new ArrayList<>();
         List<Pair<Image>> unseenCandidatePairs = new ArrayList<>();
 
         for (int i = 0; i < images.size() - 1; i++) {
             for (int j = i + 1; j < images.size(); j++) {
                 Image img1 = images.get(i);
                 Image img2 = images.get(j);
+                Pair<Image> pair = new Pair<>(img1, img2);
+                allPairs.add(pair);
                 String key = ExhaustiveSelectionAlgorithm.buildPairKey(img1.getId(), img2.getId());
                 if (!seenPairKeys.contains(key)) {
-                    unseenCandidatePairs.add(new Pair<>(img1, img2));
+                    unseenCandidatePairs.add(pair);
                 }
             }
         }
 
-        if (unseenCandidatePairs.isEmpty()) {
+        List<Pair<Image>> candidatePairs = unseenCandidatePairs.isEmpty() ? allPairs : unseenCandidatePairs;
+        if (candidatePairs.isEmpty()) {
             return null;
         }
 
         Map<String, Integer> exposureCounts = calculateImageExposure(survey);
         Map<String, Integer> ratings = getImageRatings(survey);
 
-        Pair<Image> chosenPair = selectPairByAdaptiveStrategy(unseenCandidatePairs, exposureCounts, ratings);
+        Pair<Image> chosenPair = selectPairByAdaptiveStrategy(candidatePairs, exposureCounts, ratings);
 
         if (random.nextBoolean()) {
             return new Pair<>(chosenPair.getT2(), chosenPair.getT1());

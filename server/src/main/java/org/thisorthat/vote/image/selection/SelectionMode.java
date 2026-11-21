@@ -1,6 +1,7 @@
 package org.thisorthat.vote.image.selection;
 
 import org.thisorthat.dto.Survey;
+import org.thisorthat.dto.VotingMode;
 
 public enum SelectionMode {
     AUTO,
@@ -12,6 +13,12 @@ public enum SelectionMode {
     public static SelectionMode resolveEffectiveMode(Survey survey) {
         if (survey == null) {
             return EXHAUSTIVE;
+        }
+        if (survey.getVotingMode() == VotingMode.EXHAUSTIVE) {
+            return EXHAUSTIVE;
+        }
+        if (survey.getVotingMode() == VotingMode.ENDLESS) {
+            return ADAPTIVE;
         }
         SelectionMode configured = survey.getSelectionMode();
         if (configured == null || configured == AUTO) {

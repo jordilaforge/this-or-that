@@ -17,18 +17,19 @@ package org.thisorthat.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.thisorthat.api.dto.Score;
 import org.thisorthat.api.dto.ScoreResponse;
 import org.thisorthat.api.dto.VoteRequest;
 import org.thisorthat.api.dto.VoteResponse;
 import org.thisorthat.db.InMemoryDatabase;
-import org.thisorthat.dto.Image;
-import org.thisorthat.dto.Survey;
-import org.thisorthat.dto.VoteItem;
+import org.thisorthat.dto.*;
 import org.thisorthat.exception.*;
 import org.thisorthat.vote.SimpleVoteAlgorithm;
 import org.thisorthat.vote.image.selection.AdaptiveSelectionAlgorithm;
+import org.thisorthat.vote.image.selection.ExhaustiveSelectionAlgorithm;
 import org.thisorthat.vote.image.selection.SelectionMode;
 
 import java.util.*;
@@ -42,27 +43,80 @@ public class SurveyService {
     private final InMemoryDatabase inMemoryDatabase;
     private final SimpleVoteAlgorithm randomAlgorithm;
     private final CampaignQualityService campaignQualityService;
+    private final ExhaustiveSelectionAlgorithm exhaustiveSelectionAlgorithm;
+    private final int exhaustiveThreshold;
 
     public SurveyService(InMemoryDatabase inMemoryDatabase,
                          SimpleVoteAlgorithm randomAlgorithm,
                          CampaignQualityService campaignQualityService) {
+        this(inMemoryDatabase, randomAlgorithm, campaignQualityService, new ExhaustiveSelectionAlgorithm(inMemoryDatabase), 45);
+    }
+
+    public SurveyService(InMemoryDatabase inMemoryDatabase,
+                         SimpleVoteAlgorithm randomAlgorithm,
+                         ExhaustiveSelectionAlgorithm exhaustiveSelectionAlgorithm,
+                         int exhaustiveThreshold) {
+        this(inMemoryDatabase, randomAlgorithm, new CampaignQualityService(), exhaustiveSelectionAlgorithm, exhaustiveThreshold);
+    }
+
+    @Autowired
+    public SurveyService(InMemoryDatabase inMemoryDatabase,
+                         SimpleVoteAlgorithm randomAlgorithm,
+                         CampaignQualityService campaignQualityService,
+                         ExhaustiveSelectionAlgorithm exhaustiveSelectionAlgorithm,
+                         @Value("${survey.voting.exhaustive-threshold:45}") int exhaustiveThreshold) {
         this.inMemoryDatabase = inMemoryDatabase;
         this.randomAlgorithm = randomAlgorithm;
         this.campaignQualityService = campaignQualityService;
+        this.exhaustiveSelectionAlgorithm = exhaustiveSelectionAlgorithm;
+        this.exhaustiveThreshold = exhaustiveThreshold;
+    }
+
+    public int getExhaustiveThreshold() {
+        return exhaustiveThreshold;
+    }
+
+    public VotingMode determineVotingMode(Survey survey) {
+        if (survey.getVotingMode() != null) {
+            return survey.getVotingMode();
+        }
+        if (survey.getSelectionMode() == SelectionMode.EXHAUSTIVE) {
+            return VotingMode.EXHAUSTIVE;
+        }
+        if (survey.getSelectionMode() == SelectionMode.ADAPTIVE) {
+            return VotingMode.ENDLESS;
+        }
+        int imageCount = survey.getImages() != null ? survey.getImages().size() : 0;
+        int totalComparisons = ExhaustiveSelectionAlgorithm.calculateTotalComparisons(imageCount);
+        return (imageCount >= 2 && totalComparisons <= exhaustiveThreshold)
+                ? VotingMode.EXHAUSTIVE
+                : VotingMode.ENDLESS;
     }
 
     public Survey createSurvey(String perspective) {
-        return createSurvey(perspective, SelectionMode.AUTO, null);
+        return createSurvey(perspective, SelectionMode.AUTO, null, null);
     }
 
     public Survey createSurvey(String perspective, SelectionMode selectionMode, Integer maxComparisonsPerUser) {
-        log.info("create survey with perspective {}, mode {}", perspective, selectionMode);
+        return createSurvey(perspective, selectionMode, maxComparisonsPerUser, null);
+    }
+
+    public Survey createSurvey(String perspective, SelectionMode selectionMode, Integer maxComparisonsPerUser, VotingMode votingMode) {
+        log.info("create survey with perspective {}, mode {}, votingMode {}", perspective, selectionMode, votingMode);
         long index = inMemoryDatabase.surveyCount();
         String code = CodeCreator.createCode(index);
         log.info("code created: {}", code);
         Survey survey = new Survey(code, perspective);
         survey.setSelectionMode(selectionMode != null ? selectionMode : SelectionMode.AUTO);
         survey.setMaxComparisonsPerUser(maxComparisonsPerUser);
+        if (votingMode != null) {
+            survey.setVotingMode(votingMode);
+            if (votingMode == VotingMode.EXHAUSTIVE) {
+                survey.setSelectionMode(SelectionMode.EXHAUSTIVE);
+            } else if (votingMode == VotingMode.ENDLESS) {
+                survey.setSelectionMode(SelectionMode.ADAPTIVE);
+            }
+        }
         inMemoryDatabase.addSurvey(survey);
         log.info("added survey to inMemory");
         return survey;
@@ -70,9 +124,12 @@ public class SurveyService {
 
     public void startSurvey(String surveyCode) {
         checkIfSurveyIsAlreadyStarted(surveyCode);
+        Survey survey = inMemoryDatabase.getSurvey(surveyCode);
+        VotingMode mode = determineVotingMode(survey);
+        survey.setVotingMode(mode);
         inMemoryDatabase.startSurvey(surveyCode);
         randomAlgorithm.initialize(surveyCode);
-        log.info("survey {} started and initialized", surveyCode);
+        log.info("survey {} started in {} mode", surveyCode, mode);
     }
 
     public void stopSurvey(String surveyCode) {
@@ -84,35 +141,79 @@ public class SurveyService {
     public VoteResponse getVote(String surveyCode, String userId) {
         checkIfSurveyIsStopped(surveyCode);
         Survey survey = inMemoryDatabase.getSurvey(surveyCode);
-        VoteItem voteItem = randomAlgorithm.getVote(surveyCode, userId);
+        VotingMode mode = survey.getVotingMode() != null
+                ? survey.getVotingMode()
+                : determineVotingMode(survey);
 
-        int userVoteCount = getComparisonCountForUser(survey, userId);
-        int totalExpected = getTotalExpectedComparisons(survey);
+        if (mode == VotingMode.EXHAUSTIVE) {
+            ExhaustiveVoteState state = exhaustiveSelectionAlgorithm.evaluate(survey, userId);
+            if (state.completed() || state.image1() == null || state.image2() == null) {
+                log.info("survey {} participant {} has completed all exhaustive comparisons", surveyCode, userId);
+                return new VoteResponse(
+                        null,
+                        null,
+                        true,
+                        survey.getPerspective(),
+                        VotingMode.EXHAUSTIVE,
+                        state.totalComparisons(),
+                        state.totalComparisons(),
+                        true,
+                        true,
+                        state.totalComparisons()
+                );
+            }
 
-        if (voteItem == null) {
-            log.info("survey {} participant {} has completed comparisons", surveyCode, userId);
+            log.info("survey {} (exhaustive) get vote from {} image1: {} image2: {}",
+                    surveyCode, userId, state.image1().getId(), state.image2().getId());
             return new VoteResponse(
-                    null,
-                    null,
+                    state.image1().getId(),
+                    state.image2().getId(),
                     true,
                     survey.getPerspective(),
+                    VotingMode.EXHAUSTIVE,
+                    state.totalComparisons(),
+                    state.completedComparisons(),
+                    false,
+                    false,
+                    state.completedComparisons() + 1
+            );
+        } else {
+            VoteItem voteItem = randomAlgorithm.getVote(surveyCode, userId);
+            int userVotes = survey.getVotes() != null ? (int) survey.getVotes().stream()
+                    .filter(v -> userId.equals(v.getUserId()))
+                    .count() : 0;
+
+            if (voteItem == null) {
+                log.info("survey {} participant {} has completed comparisons", surveyCode, userId);
+                return new VoteResponse(
+                        null,
+                        null,
+                        true,
+                        survey.getPerspective(),
+                        VotingMode.ENDLESS,
+                        survey.getMaxComparisonsPerUser(),
+                        userVotes,
+                        true,
+                        true,
+                        userVotes
+                );
+            }
+
+            log.info("survey {} (endless) get vote from {} image1: {} image2: {}",
+                    surveyCode, userId, voteItem.getFile1().getId(), voteItem.getFile2().getId());
+            return new VoteResponse(
+                    voteItem.getFile1().getId(),
+                    voteItem.getFile2().getId(),
                     true,
-                    userVoteCount,
-                    totalExpected
+                    survey.getPerspective(),
+                    VotingMode.ENDLESS,
+                    survey.getMaxComparisonsPerUser(),
+                    userVotes,
+                    false,
+                    false,
+                    userVotes + 1
             );
         }
-
-        log.info("survey {} get vote from {} image1: {} image2: {}",
-                surveyCode, userId, voteItem.getFile1().getId(), voteItem.getFile2().getId());
-        return new VoteResponse(
-                voteItem.getFile1().getId(),
-                voteItem.getFile2().getId(),
-                true,
-                survey.getPerspective(),
-                false,
-                userVoteCount + 1,
-                totalExpected
-        );
     }
 
     public void setVote(String surveyCode, VoteRequest voteRequest, String userId) {
@@ -124,7 +225,7 @@ public class SurveyService {
 
     public ScoreResponse getScore(String surveyCode) {
         Survey survey = getSurvey(surveyCode);
-        if (survey.getStarted() != null && survey.getStarted()) {
+        if (survey.getStarted() != null && survey.getStarted()) { // survey still running. Scores are not available yet!
             throw new SurveyStillRunningException("survey " + surveyCode + " is still running:");
         }
 
@@ -199,14 +300,14 @@ public class SurveyService {
         }
     }
 
-    private int getComparisonCountForUser(Survey survey, String userId) {
+    public int getComparisonCountForUser(Survey survey, String userId) {
         if (survey.getVotes() == null || userId == null) {
             return 0;
         }
         return (int) survey.getVotes().stream().filter(v -> userId.equals(v.getUserId())).count();
     }
 
-    private int getTotalExpectedComparisons(Survey survey) {
+    public int getTotalExpectedComparisons(Survey survey) {
         SelectionMode mode = SelectionMode.resolveEffectiveMode(survey);
         int imageCount = survey.getImages() != null ? survey.getImages().size() : 0;
         int totalPairs = imageCount > 1 ? (imageCount * (imageCount - 1)) / 2 : 0;

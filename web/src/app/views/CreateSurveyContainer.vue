@@ -153,9 +153,9 @@
             const count = this.validImageCount;
             if (count <= 10) {
                 const totalPairs = (count * (count - 1)) / 2;
-                return `Exhaustive Mode (Auto-detected for ${count} images: participants will compare all ${totalPairs} unique pairs)`;
+                return `Exhaustive Mode (Auto-detected for ${count} images: participants compare all ${totalPairs} unique pairs and stop)`;
             }
-            return `Adaptive Mode (Auto-detected for ${count} images: Elo-based matchmaking with balanced exposure)`;
+            return `Endless Mode (Auto-detected for ${count} images: continuous Elo-based matchmaking until survey is closed)`;
         }
 
         @Watch('imageFiles')
